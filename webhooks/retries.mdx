@@ -1,0 +1,20 @@
+---
+title: "Retries"
+description: "Backoff schedule and how to retrigger failed deliveries."
+icon: "repeat"
+---
+
+Failed deliveries (timeouts, non-2xx) are retried automatically:
+
+| Attempt | Delay before next try |
+| ------- | --------------------- |
+| 1 | 30 seconds |
+| 2 | 2 minutes |
+| 3 | 10 minutes |
+| 4 | 30 minutes |
+| 5 | 2 hours |
+| 6 | 6 hours |
+| 7 | 12 hours |
+| 8 | 24 hours (then marked failed) |
+
+Each attempt is listed under **Event Logs**. You can **retrigger** a failed delivery from the dashboard. Admins can pause webhooks globally (`WEBHOOKS_ENABLED`) or per tenant (`webhooks_paused`) during incidents.

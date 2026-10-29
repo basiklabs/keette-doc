@@ -1,0 +1,35 @@
+---
+title: "Environments"
+description: "One endpoint. Live and sandbox are selected by your API key."
+icon: "globe"
+---
+
+## One endpoint
+
+All public requests use the same host and path prefix:
+
+```text
+https://api.keette.com/v1
+```
+
+There is no separate sandbox hostname for v1. The **API key** selects the environment:
+
+| Key prefix   | Environment | Money and rails        |
+| ------------ | ----------- | ---------------------- |
+| `sk_live_…`  | Live        | Real balances and rails |
+| `sk_test_…`  | Sandbox     | Twin workspace books (isolated) |
+
+Business workspaces have a **live** home tenant and a linked **sandbox twin**. After KYB approval you land in **Live**; Dev mode in the dashboard switches onto the twin. `sk_test_…` keys and sandbox webhooks belong to that twin.
+
+In Dev mode, partner rails are never called. Use **Bank Simulator** (General) to credit sandbox balances — emails, notifications, and webhooks still fire.
+
+## Isolation
+
+- **Webhooks and API keys** are scoped to the active workspace (live or sandbox twin).
+- Responses include `livemode` / `environment` from the key you used.
+- Prefer `sk_test_…` while integrating; use `sk_live_…` only when you intend real money movement.
+- **Individuals** have no Dev toggle and no sandbox twin — they are always live.
+
+## Webhooks
+
+Register a webhook URL per environment. Live endpoints receive only live events; sandbox endpoints receive only sandbox events. Each environment has its own signing secret.

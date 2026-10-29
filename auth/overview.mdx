@@ -1,0 +1,41 @@
+---
+title: "Authentication"
+description: "Authenticate public API requests with a secret API key."
+icon: "shield-check"
+---
+
+## Bearer API keys
+
+Pass your secret key on every request:
+
+```bash
+curl https://api.keette.com/v1/me \
+  -H "Authorization: Bearer sk_live_…"
+```
+
+Keys are shown **once** at creation, stored hashed at rest, and always carry an **expiry** (maximum 90 days).
+
+## What the key carries
+
+Resolving a key binds the request to:
+
+- **Tenant** (workspace)
+- **Environment** (`live` or `sandbox` from the key prefix)
+- Optional **IP allowlist**
+- Revocation and kill-switch state (global or per tenant)
+
+## Idempotency
+
+Mutating requests (`POST`, `PATCH`, `DELETE`) should send:
+
+```http
+Idempotency-Key: <unique-string>
+```
+
+Keys are scoped to `(tenant, environment, api_key)`.
+
+## Next
+
+- [API keys](/auth/api-keys) — create, expiry, IP allowlist, revoke
+- [Retrieve me](/api-reference/me) — connectivity check
+- [Errors](/guides/errors) — public error envelope

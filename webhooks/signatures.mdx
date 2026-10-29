@@ -1,0 +1,256 @@
+---
+title: "Signatures"
+description: "Verify webhook authenticity with the signing secret."
+icon: "pen"
+---
+
+Every delivery is an HTTPS `POST` with a JSON body and these headers:
+
+| Header | Value |
+| ------ | ----- |
+| `Content-Type` | `application/json` |
+| `Keette-Timestamp` | Unix seconds (UTC) when the request was signed |
+| `Keette-Signature` | `v1=` + hex(HMAC-SHA256(secret, `{timestamp}.{rawBody}`)) |
+| `Keette-Delivery-Id` | Delivery attempt id (UUID) |
+| `Keette-Event` | Event type, e.g. `event.ping` |
+
+## Verify
+
+1. Read the **raw** request body (do not re-serialize JSON)
+2. Read `Keette-Timestamp` and `Keette-Signature`
+3. Reject if the timestamp is older than **5 minutes** (replay window)
+4. Compute `HMAC-SHA256(signing_secret, timestamp + "." + raw_body)` as hex
+5. Compare to the value after `v1=` with a constant-time compare
+
+Use the signing secret from **Settings → Developers → Webhooks** for that environment.
+
+<CodeGroup>
+
+```javascript Node.js
+const crypto = require("crypto");
+
+const MAX_AGE_SEC = 5 * 60;
+
+function verify(secret, timestamp, rawBody, signatureHeader) {
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts)) return false;
+  if (Math.abs(Date.now() / 1000 - ts) > MAX_AGE_SEC) return false;
+
+  const expected =
+    "v1=" +
+    crypto
+      .createHmac("sha256", secret)
+      .update(`${timestamp}.${rawBody}`)
+      .digest("hex");
+
+  const a = Buffer.from(expected);
+  const b = Buffer.from(String(signatureHeader || ""));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+// Express: use express.raw({ type: "application/json" }) so req.body is a Buffer.
+app.post("/webhooks/keette", (req, res) => {
+  const ok = verify(
+    process.env.KEETTE_WEBHOOK_SECRET,
+    req.get("Keette-Timestamp"),
+    req.body.toString("utf8"),
+    req.get("Keette-Signature"),
+  );
+  if (!ok) return res.status(401).send("invalid signature");
+  // handle JSON.parse(req.body.toString("utf8"))
+  res.sendStatus(200);
+});
+```
+
+```python Python
+import hashlib
+import hmac
+import time
+
+MAX_AGE_SEC = 5 * 60
+
+
+def verify(secret: str, timestamp: str, raw_body: bytes | str, signature_header: str) -> bool:
+    try:
+        ts = int(timestamp)
+    except (TypeError, ValueError):
+        return False
+    if abs(time.time() - ts) > MAX_AGE_SEC:
+        return False
+
+    if isinstance(raw_body, str):
+        raw_body = raw_body.encode("utf-8")
+
+    digest = hmac.new(
+        secret.encode("utf-8"),
+        f"{timestamp}.".encode("utf-8") + raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+    expected = f"v1={digest}"
+    return hmac.compare_digest(expected, signature_header or "")
+
+
+# Flask: use request.get_data() so the body is unmodified.
+@app.post("/webhooks/keette")
+def keette_webhook():
+    raw = request.get_data()
+    if not verify(
+        os.environ["KEETTE_WEBHOOK_SECRET"],
+        request.headers.get("Keette-Timestamp"),
+        raw,
+        request.headers.get("Keette-Signature"),
+    ):
+        return ("invalid signature", 401)
+    # handle json.loads(raw)
+    return ("", 200)
+```
+
+```go Go
+package main
+
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"math"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+)
+
+const maxAge = 5 * time.Minute
+
+func verify(secret, timestamp string, rawBody []byte, signatureHeader string) bool {
+	ts, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		return false
+	}
+	if math.Abs(float64(time.Now().UTC().Unix()-ts)) > maxAge.Seconds() {
+		return false
+	}
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(timestamp))
+	_, _ = mac.Write([]byte("."))
+	_, _ = mac.Write(rawBody)
+	expected := "v1=" + hex.EncodeToString(mac.Sum(nil))
+	return hmac.Equal([]byte(expected), []byte(strings.TrimSpace(signatureHeader)))
+}
+
+func handler(secret string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "bad body", http.StatusBadRequest)
+			return
+		}
+		if !verify(secret, r.Header.Get("Keette-Timestamp"), raw, r.Header.Get("Keette-Signature")) {
+			http.Error(w, "invalid signature", http.StatusUnauthorized)
+			return
+		}
+		// handle json.Unmarshal(raw, &event)
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func main() {
+	fmt.Println("mount handler(os.Getenv(\"KEETTE_WEBHOOK_SECRET\")) on POST /webhooks/keette")
+}
+```
+
+```ruby Ruby
+require "openssl"
+
+MAX_AGE_SEC = 5 * 60
+
+def verify(secret, timestamp, raw_body, signature_header)
+  ts = Integer(timestamp)
+  return false if (Time.now.to_i - ts).abs > MAX_AGE_SEC
+
+  body = raw_body.is_a?(String) ? raw_body : raw_body.to_s
+  digest = OpenSSL::HMAC.hexdigest("SHA256", secret, "#{timestamp}.#{body}")
+  expected = "v1=#{digest}"
+  given = signature_header.to_s
+  return false if expected.bytesize != given.bytesize
+
+  OpenSSL.fixed_length_secure_compare(expected, given)
+rescue ArgumentError, TypeError
+  false
+end
+
+# Rails: request.raw_post preserves the body.
+# post "/webhooks/keette" { verify(ENV.fetch("KEETTE_WEBHOOK_SECRET"), ...) }
+```
+
+```php PHP
+<?php
+
+function keette_verify(string $secret, string $timestamp, string $rawBody, string $signatureHeader): bool
+{
+    if (!ctype_digit($timestamp)) {
+        return false;
+    }
+    if (abs(time() - (int) $timestamp) > 5 * 60) {
+        return false;
+    }
+    $digest = hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret);
+    $expected = 'v1=' . $digest;
+    return hash_equals($expected, $signatureHeader);
+}
+
+// Read php://input before any JSON decode.
+$raw = file_get_contents('php://input');
+$ok = keette_verify(
+    getenv('KEETTE_WEBHOOK_SECRET'),
+    $_SERVER['HTTP_KEETTE_TIMESTAMP'] ?? '',
+    $raw,
+    $_SERVER['HTTP_KEETTE_SIGNATURE'] ?? ''
+);
+if (!$ok) {
+    http_response_code(401);
+    echo 'invalid signature';
+    exit;
+}
+// handle json_decode($raw, true);
+http_response_code(200);
+```
+
+```java Java
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Instant;
+
+public final class KeetteSignature {
+  private static final long MAX_AGE_SEC = 5 * 60;
+
+  public static boolean verify(String secret, String timestamp, byte[] rawBody, String signatureHeader)
+      throws Exception {
+    long ts = Long.parseLong(timestamp);
+    if (Math.abs(Instant.now().getEpochSecond() - ts) > MAX_AGE_SEC) {
+      return false;
+    }
+    Mac mac = Mac.getInstance("HmacSHA256");
+    mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+    mac.update(timestamp.getBytes(StandardCharsets.UTF_8));
+    mac.update((byte) '.');
+    mac.update(rawBody);
+    StringBuilder hex = new StringBuilder();
+    for (byte b : mac.doFinal()) {
+      hex.append(String.format("%02x", b));
+    }
+    String expected = "v1=" + hex;
+    return MessageDigest.isEqual(
+        expected.getBytes(StandardCharsets.UTF_8),
+        signatureHeader.getBytes(StandardCharsets.UTF_8));
+  }
+}
+```
+
+</CodeGroup>
+
+Regenerate the secret in **Settings → Developers → Webhooks** if it may be compromised — old signatures stop verifying after rotation.

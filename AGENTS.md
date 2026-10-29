@@ -1,33 +1,35 @@
-> **First-time setup**: Customize this file for your project. Prompt the user to customize this file for their project.
-> For Mintlify product knowledge (components, configuration, writing standards),
-> install the Mintlify skill: `npx skills add https://mintlify.com/docs`
-
 # Documentation project instructions
 
 ## About this project
 
-- This is a documentation site built on [Mintlify](https://mintlify.com)
-- Pages are MDX files with YAML frontmatter
+- Keette Developers docs on [Mintlify](https://mintlify.com)
+- Pages are MDX with YAML frontmatter
 - Configuration lives in `docs.json`
-- Use the Mintlify MCP server, `https://mcp.mintlify.com`, to edit content and settings via MCP
-- Use the Mintlify docs MCP server, `https://www.mintlify.com/docs/mcp`, to query information about using Mintlify via MCP
+- Brand: primary `#061F00`, accent `#A5E119`, font Uncut Sans (`/fonts/UncutSans-Variable.woff2`)
+- Logo includes the Keette wordmark plus a **Developers** suffix
 
 ## Terminology
 
-{/* Add product-specific terms and preferred usage */}
-{/* Example: Use "workspace" not "project", "member" not "user" */}
+- Use **workspace** for a tenant account in product copy; `tenant` is fine in API field names
+- Use **live** and **sandbox** (not “prod” / “dev”) for API environments
+- Keys: `sk_live_…` / `sk_test_…`
+- Event names: `event.<resource>` or `event.<resource>.<action>`
 
 ## Style preferences
 
-{/* Add any project-specific style rules below */}
-
-- Use active voice and second person ("you")
-- Keep sentences concise — one idea per sentence
-- Use sentence case for headings
+- Active voice, second person ("you")
+- Concise sentences — one idea per sentence
+- Sentence case for headings
 - Bold for UI elements: Click **Settings**
-- Code formatting for file names, commands, paths, and code references
+- Code formatting for paths, headers, and identifiers
+- When a surface is not shipped yet, mark **Phase N** with a Note — do not invent request/response fields ahead of implementation
 
 ## Content boundaries
 
-{/* Define what should and shouldn't be documented */}
-{/* Example: Don't document internal admin features */}
+- **Guides** tab: concepts (auth, environments, webhooks, errors)
+- **API reference** tab: list endpoints flat in `docs.json` as `"METHOD /path"` under a group with `"openapi": "openapi.yaml"`. Do **not** also list MDX pages for those same paths (duplicates), and do **not** omit the pages list (Mintlify then nests every OpenAPI tag as a collapse folder).
+- Flat sidebar only: no collapse folders for endpoints
+- OpenAPI `summary` is the sidebar label — keep it short (one line, no wrap). Group pages by resource (Balances, Transactions, Beneficiaries, FX…); within a group, shortest title first
+- Do not document internal Payment/Ledger/admin operator APIs or session JWT app routes as public
+- After each implementation phase, add the path to `openapi.yaml` and a `"METHOD /path"` entry in `docs.json` in the same change set
+

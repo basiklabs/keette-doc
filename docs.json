@@ -1,53 +1,183 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "Keette Developers",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#061F00",
+    "light": "#A5E119",
+    "dark": "#061F00"
   },
   "favicon": "/favicon.svg",
+  "fonts": {
+    "family": "Uncut Sans",
+    "source": "/fonts/UncutSans-Variable.woff2",
+    "format": "woff2"
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "/"
+  },
+  "api": {
+    "mdx": {
+      "server": "https://20b9-41-90-209-232.ngrok-free.app/v1"
+    },
+    "playground": {
+      "display": "interactive",
+      "proxy": true
+    },
+    "examples": {
+      "languages": ["curl", "node", "python", "go"],
+      "defaults": "required",
+      "prefill": true
+    }
+  },
   "navigation": {
-    "pages": [
+    "tabs": [
       {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Getting started",
+            "icon": "rocket",
+            "pages": ["quickstart", "index", "environments"]
+          },
+          {
+            "group": "Auth",
+            "icon": "key",
+            "pages": ["auth/api-keys", "auth/overview"]
+          },
+          {
+            "group": "Money",
+            "icon": "coins",
+            "pages": [
+              "guides/fx",
+              "guides/swaps",
+              "guides/payins",
+              "guides/payouts",
+              "guides/balances",
+              "guides/corridors",
+              "guides/transactions",
+              "guides/beneficiaries"
+            ]
+          },
+          {
+            "group": "Errors",
+            "icon": "ban",
+            "pages": ["guides/errors"]
+          },
+          {
+            "group": "Webhooks",
+            "icon": "webhook",
+            "pages": [
+              "webhooks/overview",
+              "webhooks/events",
+              "webhooks/signatures",
+              "webhooks/retries"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["api-reference/introduction"]
+          },
+          {
+            "group": "Account",
+            "openapi": "openapi.yaml",
+            "pages": ["GET /me", "POST /ping", "GET /events", "GET /events/{id}"]
+          },
+          {
+            "group": "Balances",
+            "openapi": "openapi.yaml",
+            "pages": ["GET /balances"]
+          },
+          {
+            "group": "Transactions",
+            "openapi": "openapi.yaml",
+            "pages": ["GET /transactions/{id}", "GET /transactions"]
+          },
+          {
+            "group": "Beneficiaries",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "GET /beneficiaries/{id}",
+              "GET /beneficiaries",
+              "POST /beneficiaries",
+              "PATCH /beneficiaries/{id}",
+              "POST /beneficiaries/{id}/archive"
+            ]
+          },
+          {
+            "group": "Corridors",
+            "openapi": "openapi.yaml",
+            "pages": ["GET /corridors"]
+          },
+          {
+            "group": "FX",
+            "openapi": "openapi.yaml",
+            "pages": ["GET /fx/rate", "POST /fx/quotes"]
+          },
+          {
+            "group": "Payouts",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "GET /payouts/purposes",
+              "GET /payouts/{id}",
+              "POST /payouts/fee",
+              "POST /payouts",
+              "POST /payouts/{id}/cancel"
+            ]
+          },
+          {
+            "group": "Swaps",
+            "openapi": "openapi.yaml",
+            "pages": ["GET /swaps/{id}", "POST /swaps"]
+          },
+          {
+            "group": "Payins",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "GET /payins/sources",
+              "GET /payins/{id}",
+              "POST /payins/fee",
+              "POST /payins",
+              "POST /payins/preview",
+              "POST /payins/prepare"
+            ]
+          }
         ]
       }
     ],
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "Guides",
+          "href": "/quickstart",
+          "icon": "book-open"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "API reference",
+          "href": "/api-reference/introduction",
+          "icon": "code"
         }
       ]
     }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
   },
   "navbar": {
     "links": [
       {
         "label": "Support",
-        "href": "mailto:support@mintlify.com"
+        "href": "mailto:talk@keette.com"
       }
     ],
     "primary": {
       "type": "button",
       "label": "Dashboard",
-      "href": "https://app.mintlify.com"
+      "href": "https://app.keette.com"
     }
   },
   "contextual": {
@@ -64,9 +194,8 @@
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "x": "https://x.com/keette",
+      "linkedin": "https://linkedin.com/company/keette"
     }
   }
 }

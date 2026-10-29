@@ -1,0 +1,52 @@
+---
+title: "FX"
+description: "Indicative rates and firm quotes for payouts and swaps."
+icon: "dollar-sign"
+---
+
+Keette exposes two FX surfaces:
+
+| Endpoint | Use |
+| -------- | --- |
+| `GET /v1/fx/rate` | Indicative rate for display |
+| `POST /v1/fx/quotes` | Firm quote you lock and pass into a payout or swap |
+
+## Indicative rate
+
+```bash
+curl "https://api.keette.com/v1/fx/rate?from=USD&to=NGN" \
+  -H "Authorization: Bearer sk_test_…"
+```
+
+Safe for UI previews. Do **not** treat it as a lock — amounts can move before you create a quote.
+
+## Firm quote
+
+Send exactly one of `amount_from` or `amount_to` (Ledger minor units):
+
+```bash
+curl https://api.keette.com/v1/fx/quotes \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "USD",
+    "to": "NGN",
+    "amount_from": 10000,
+    "purpose": "swap"
+  }'
+```
+
+- Omit `purpose` (or leave empty) for a **payout** quote
+- Set `"purpose": "swap"` when the quote will go to `POST /v1/swaps`
+
+Pass the returned quote `id` as `quote_id` on the payout or swap. Quotes expire — create the money movement promptly.
+
+## Dev mode
+
+Dashboard **Dev** mode does not call partner FX for firm quotes. Indicative rates may still be available for display; use sandbox cloud / Live when you need a real firm quote against partner rails.
+
+## Next
+
+- [Swaps](/guides/swaps) — move between your own books
+- [Payouts](/guides/payouts) — cross-currency sends
+- [API reference — FX](/api-reference/fx)

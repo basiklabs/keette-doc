@@ -1,0 +1,28 @@
+---
+title: "Balances"
+description: "Read available and held amounts on each currency book."
+icon: "money-bill-1-wave"
+---
+
+Each workspace holds one **book** per currency (fiat or stablecoin). Books show **available** (spendable) and **held** (locked for in-flight payouts or swaps).
+
+## List books
+
+```bash
+curl https://api.keette.com/v1/balances \
+  -H "Authorization: Bearer sk_live_…"
+```
+
+Amounts are **Ledger minor units** (cents, kobo, …). The response includes the currency code and scales so you can format for display.
+
+## Live vs sandbox
+
+`sk_live_…` reads live books. `sk_test_…` reads the sandbox twin. Balances never cross environments.
+
+In **Dev** mode on the dashboard, partner rails are off — credit books with **Bank Simulator**, then call the same balances endpoint with a test key.
+
+## Next
+
+- [API reference — Balances](/api-reference/balances) — `GET /v1/balances`
+- [Payouts](/guides/payouts) — send from available
+- [Payins](/guides/payins) — collect into a book

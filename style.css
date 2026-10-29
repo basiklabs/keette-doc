@@ -1,0 +1,9 @@
+/* Enlarge navbar logo so Keette + Developers stay readable */
+header img[src*="logo"],
+nav img[src*="logo"],
+a[href="/"] img {
+  height: 1.75rem !important;
+  width: auto !important;
+  max-width: min(18rem, 55vw) !important;
+  object-fit: contain;
+}

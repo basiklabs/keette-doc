@@ -1,0 +1,56 @@
+---
+title: "Payouts"
+description: "Send money from a book to a beneficiary."
+icon: "sack-dollar"
+---
+
+A **payout** debits one of your books and pays a [beneficiary](/guides/beneficiaries) on a corridor rail.
+
+## Typical sequence
+
+<Steps>
+  <Step title="Ensure a funded book">
+    `GET /v1/balances` — available must cover amount + fees.
+  </Step>
+  <Step title="Pick corridor + beneficiary">
+    [Corridors](/guides/corridors) → create or reuse a [beneficiary](/guides/beneficiaries).
+  </Step>
+  <Step title="Optional FX quote">
+    Cross-currency sends: [firm quote](/guides/fx) then pass `quote_id`.
+  </Step>
+  <Step title="Fee preview">
+    `POST /v1/payouts/fee` with the same shape you will send.
+  </Step>
+  <Step title="Create">
+    `POST /v1/payouts` — returns id and status. Poll `GET /v1/payouts/{id}` or wait for webhooks.
+  </Step>
+</Steps>
+
+```bash
+curl https://api.keette.com/v1/payouts \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "beneficiary_id": "…",
+    "amount": 50000,
+    "currency": "NGN",
+    "purpose": "salary",
+    "idempotency_key": "pay-2026-04-01-ada"
+  }'
+```
+
+Always send a stable **idempotency key** so retries do not double-send.
+
+## Cancel
+
+`POST /v1/payouts/{id}/cancel` when the payout is still cancellable (see status in the response / webhooks).
+
+## Purposes
+
+`GET /v1/payouts/purposes` lists allowed purpose codes for compliance rails that require one.
+
+## Next
+
+- [Webhooks](/webhooks/overview) — `event.payout.*`
+- [Transactions](/guides/transactions) — unified history
+- [API reference — Payouts](/api-reference/payouts)

@@ -1,0 +1,26 @@
+---
+title: "Introduction"
+description: "Interactive Keette API reference generated from OpenAPI."
+---
+
+This tab is the **API reference** — endpoint playgrounds generated from [`openapi.yaml`](/openapi.yaml), not narrative guides.
+
+Authenticate with `Authorization: Bearer sk_live_…` or `sk_test_…`. See [Authentication](/auth/overview) and [Environments](/environments) in Guides.
+
+The playground base URL comes from OpenAPI `servers` (and `api.mdx.server` in `docs.json`). Use the server dropdown to switch between **Local (ngrok)** and **Production**. After changing those files, restart `mintlify dev` and hard-refresh the browser.
+
+For free ngrok, add request header `ngrok-skip-browser-warning: true` in the playground if the response is an HTML interstitial instead of JSON.
+
+## Available now
+
+| Area | Endpoints |
+| ---- | --------- |
+| Account | [Me](/api-reference/account/me), [Ping](/api-reference/events/ping), [Events](/api-reference/events/events) (`GET /v1/events`, `GET /v1/events/{id}`) |
+| Balances | [Balances](/api-reference/balances/balances) |
+| Transactions | [Transaction](/api-reference/transactions/transaction), [Transactions](/api-reference/transactions/transactions) |
+| Beneficiaries | [Beneficiary](/api-reference/beneficiaries/beneficiary), [Beneficiaries](/api-reference/beneficiaries/beneficiaries) |
+| Corridors | [Corridors](/api-reference/catalog/corridors) |
+| FX | [FX rate](/api-reference/fx/fx-rate), [FX quote](/api-reference/fx/fx-quote) |
+| Payouts | [Create](/api-reference/payouts/create-payout), [Fee](/api-reference/payouts/payout-fee), [Get](/api-reference/payouts/get-payout), [Cancel](/api-reference/payouts/cancel-payout) |
+| Swaps | [Create](/api-reference/swaps/create-swap), [Get](/api-reference/swaps/get-swap) |
+| Payins | [Sources](/api-reference/payins/sources), [Fee](/api-reference/payins/payin-fee), [Preview](/api-reference/payins/payin-preview), [Prepare](/api-reference/payins/prepare-payin), [Create](/api-reference/payins/create-payin), [Get](/api-reference/payins/get-payin) |

@@ -1,0 +1,42 @@
+---
+title: "Payins"
+description: "Collect money into your books from supported sources."
+icon: "money-simple-from-bracket"
+---
+
+**Payins** (collections) credit one of your books from an external payer — open banking, mobile money, cards, and other sources depending on your workspace.
+
+## Sources
+
+```bash
+curl https://api.keette.com/v1/payins/sources \
+  -H "Authorization: Bearer sk_test_…"
+```
+
+Use the returned source ids / methods when building prepare and create payloads.
+
+## Flow
+
+<Steps>
+  <Step title="Preview or fee">
+    `POST /v1/payins/preview` and/or `POST /v1/payins/fee` to show the customer what lands on the book.
+  </Step>
+  <Step title="Prepare">
+    `POST /v1/payins/prepare` — may return a redirect URL, payment intent, or next step for the payer.
+  </Step>
+  <Step title="Create / complete">
+    `POST /v1/payins` to finalize when your flow requires it. Track with `GET /v1/payins/{id}`.
+  </Step>
+</Steps>
+
+Subscribe to payin / inflow webhooks so you do not rely only on redirects.
+
+## Dev mode
+
+In dashboard **Dev**, partner collection rails are not called. Use **Bank Simulator** to credit sandbox books and exercise balances, emails, and webhooks.
+
+## Next
+
+- [Balances](/guides/balances)
+- [Webhooks](/webhooks/overview)
+- [API reference — Payins](/api-reference/payins)

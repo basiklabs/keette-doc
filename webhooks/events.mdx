@@ -1,0 +1,140 @@
+---
+title: "Event types"
+description: "Catalog of event.* names with descriptions and examples."
+icon: "list-tree"
+---
+
+Event type names are a **stable contract**. Once shipped, a type is never renamed or removed — only new types are added. Naming follows `event.<resource>` or `event.<resource>.<action>`.
+
+Subscribe only to what you need per webhook endpoint. Each delivery body is:
+
+```json
+{
+  "id": "…",
+  "object": "event",
+  "type": "event.payout.completed",
+  "created": 1730000000,
+  "livemode": false,
+  "environment": "sandbox",
+  "data": { }
+}
+```
+
+`data` is always the **last** key. Money values in `data` are JSON **floats** in major units with **6 decimal places** (`0.310000`). Companion `*_minor` fields are Ledger integers (`31` when `scale` is `2`).
+
+The same catalog appears under **Settings → Developers → Webhooks**.
+
+## Account
+
+| Type | When |
+| ---- | ---- |
+| `event.ping` | Dashboard test or `POST /v1/ping` |
+| `event.api_key.created` | An API key was created in this environment |
+| `event.api_key.revoked` | An API key was revoked |
+
+## Beneficiaries
+
+| Type | When |
+| ---- | ---- |
+| `event.beneficiary.created` | Recipient created |
+| `event.beneficiary.updated` | Recipient updated |
+| `event.beneficiary.archived` | Recipient archived |
+
+`data` mirrors the public beneficiary object (`kind`, address, `routing`, `scheme`, `route_label`, …) plus `business_id`.
+
+## Payouts
+
+| Type | When |
+| ---- | ---- |
+| `event.payout.created` | Payout created (or awaiting approval) |
+| `event.payout.processing` | Held and queued / sending |
+| `event.payout.cancelled` | Cancelled before the send left Keette |
+| `event.payout.completed` | Send completed successfully |
+| `event.payout.failed` | Send failed |
+
+### Example `data` (processing)
+
+```json
+{
+  "object": "payout",
+  "id": "fb76c8fe-724e-41da-bc7c-19e0a1b2c3d4",
+  "business_id": "…",
+  "status": "queued",
+  "currency": "USD",
+  "scale": 2,
+  "amount": 200.000000,
+  "amount_minor": 20000,
+  "fee": 0.310000,
+  "fee_minor": 31,
+  "transfer_fee": 0.310000,
+  "transfer_fee_minor": 31,
+  "total_debit": 200.310000,
+  "total_debit_minor": 20031,
+  "recipient_currency": "NGN",
+  "recipient_amount": 304615.380000,
+  "recipient_amount_minor": 30461538,
+  "fx_rate": "1523.0769",
+  "rate": "1 USD = 1,523.0769 NGN",
+  "method": "Bank transfer · NIP",
+  "scheme": "ng_nip",
+  "rail": "NIP",
+  "channel": "NIP",
+  "stan": "OUT-2610-FXBZB9RE",
+  "fees": {
+    "total": 0.310000,
+    "total_minor": 31,
+    "transfer_fee": 0.310000,
+    "transfer_fee_minor": 31,
+    "currency": "USD",
+    "scale": 2
+  },
+  "beneficiary": {
+    "object": "beneficiary",
+    "id": "…",
+    "name": "Todd Albert",
+    "route_label": "5TT MFB · ••••0000",
+    "method": "bank",
+    "scheme": "ng_nip",
+    "currency": "NGN",
+    "country": "NG"
+  },
+  "documents": [
+    {
+      "id": "…",
+      "title": "invoice",
+      "file_name": "invoice.pdf",
+      "url": "https://…s3…/…?X-Amz-Signature=…",
+      "url_expires_at": "2026-10-30T07:00:00Z"
+    }
+  ],
+  "timeline": {
+    "steps": [
+      { "stage": "created", "label": "Payout created", "state": "done", "at": "…" },
+      { "stage": "authorised", "label": "Authorised", "state": "done", "at": "…" },
+      { "stage": "processing", "label": "Sending", "state": "current" }
+    ]
+  }
+}
+```
+
+When the payout has supporting files, `documents` lists each one with a signed S3 `url` (valid for 24 hours; see `url_expires_at`).
+
+## Swaps
+
+| Type | When |
+| ---- | ---- |
+| `event.swap.created` | Book-to-book FX transfer started |
+| `event.swap.completed` | Swap completed |
+| `event.swap.failed` | Swap failed |
+
+`data` includes both legs as floats (`amount_from` / `amount_to`) plus `*_minor`, `fx_rate` / `rate`, `fees`, `rail` / `channel` (`internal`), and a short `timeline`.
+
+## Payins
+
+| Type | When |
+| ---- | ---- |
+| `event.payin.created` | Deposit intent or funding attempt started |
+| `event.payin.completed` | Deposit credited your balance |
+| `event.payin.failed` | Deposit failed or expired |
+
+Created events carry method/channel and float amounts. Completed events add `gross` / `fee` / `net` (and `*_minor`), `rail`, optional `sender` details, `fees`, and `timeline`.

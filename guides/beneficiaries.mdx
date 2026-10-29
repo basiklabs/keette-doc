@@ -1,0 +1,39 @@
+---
+title: "Beneficiaries"
+description: "Create and manage payout recipients before you send."
+icon: "users"
+---
+
+A **beneficiary** is a saved payout destination (bank account, mobile money, stablecoin address, and so on). Create one once, then reference its id on every payout.
+
+## Flow
+
+1. Inspect [corridors](/guides/corridors) for the scheme and required fields
+2. `POST /v1/beneficiaries` with those fields
+3. Pass `beneficiary_id` to [payouts](/guides/payouts)
+
+```bash
+curl https://api.keette.com/v1/beneficiaries \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Ada Okonkwo",
+    "scheme": "ngn_bank",
+    "currency": "NGN",
+    "account_number": "0123456789",
+    "bank_code": "058"
+  }'
+```
+
+## Updates and archive
+
+- `PATCH /v1/beneficiaries/{id}` — change mutable fields (name, metadata)
+- `POST /v1/beneficiaries/{id}/archive` — soft-delete; existing payouts keep their snapshot
+
+List with `GET /v1/beneficiaries`. Fetch one with `GET /v1/beneficiaries/{id}`.
+
+## Next
+
+- [Corridors](/guides/corridors) — schemes and field requirements
+- [Payouts](/guides/payouts) — send to a beneficiary
+- [API reference](/api-reference/beneficiaries) — full request shapes

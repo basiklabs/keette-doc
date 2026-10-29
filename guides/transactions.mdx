@@ -1,0 +1,26 @@
+---
+title: "Transactions"
+description: "Unified history across payouts, payins, swaps, and more."
+icon: "receipt"
+---
+
+The **transactions** index is a single timeline for money movements in the key’s environment — payouts, inflows, swaps, and related kinds.
+
+## List
+
+```bash
+curl "https://api.keette.com/v1/transactions?limit=25&page=1" \
+  -H "Authorization: Bearer sk_test_…"
+```
+
+Optional filters: `kind`, `status`, `currency`.
+
+## Detail
+
+`GET /v1/transactions/{id}` returns the row plus a timeline / source detail when available. Prefer this (or webhooks) over scraping multiple resource endpoints when building an activity feed.
+
+## Next
+
+- [Webhooks](/webhooks/overview) — push instead of poll
+- [Events](/webhooks/events) — durable event catalog + `GET /v1/events`
+- [API reference — Transactions](/api-reference/transactions)

@@ -1,47 +1,42 @@
 ---
 title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+description: "Authenticate and make your first Keette API request."
+icon: "rocket"
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+Get from zero to a successful authenticated call.
 
 ## Prerequisites
 
-Before you begin, you must have:
+- A **business** Keette workspace with Developers access enabled
+- Permission to manage API keys (admin or developer role)
+- `curl` or any HTTP client
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
+Individual accounts stay on live dashboard mode only and do not issue sandbox keys.
 
 ## Get started
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
-
-    ```bash
-    npm install your-package
-    ```
+  <Step title="Create an API key">
+    In the dashboard go to **Settings → Developers → API keys**. Create a **test** key (`sk_test_…`) with an expiry of at most 90 days. Copy the secret once — it is not shown again.
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+  <Step title="Call the API">
+    Use the same base URL for live and test. The key selects the environment.
 
     ```bash
-    your-cli init
+    curl https://api.keette.com/v1/me \
+      -H "Authorization: Bearer sk_test_…"
     ```
+
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
-
-    ```bash
-    your-cli start
-    ```
+  <Step title="Check the environment">
+    The response includes which environment the key unlocked (`live` or `sandbox`). Objects created with a test key never appear under a live key.
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Next
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+- [Environments](/environments) — isolation rules for live vs sandbox
+- [API keys](/auth/api-keys) — IP allowlists, revoke, expiry
+- [Errors](/guides/errors) — public error envelope
+- [API reference](/api-reference/me) — interactive `GET /v1/me`

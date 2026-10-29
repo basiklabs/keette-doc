@@ -1,0 +1,38 @@
+---
+title: "Corridors"
+description: "Discover payout schemes, currencies, and required beneficiary fields."
+icon: "route"
+---
+
+**Corridors** are the catalog of how money can leave a book: bank rails, mobile money, wires, stablecoins, and more. Use them to drive your UI and to validate beneficiary payloads before create.
+
+## List
+
+```bash
+curl https://api.keette.com/v1/corridors \
+  -H "Authorization: Bearer sk_test_…"
+```
+
+Each corridor typically includes:
+
+| Field | Meaning |
+| ----- | ------- |
+| `scheme` | Stable id you send on beneficiaries / payouts |
+| `currency` | Book / destination currency |
+| `method` | High-level rail (bank, momo, wire, …) |
+| Required destination fields | Account number, bank code, IBAN, … |
+
+## Using corridors
+
+1. Show the customer corridors for the send currency
+2. Collect only the fields that corridor requires
+3. Create a [beneficiary](/guides/beneficiaries) with that `scheme`
+4. Create a [payout](/guides/payouts) against the beneficiary
+
+Corridor availability can differ between live and sandbox keys — always fetch with the key you will use to pay.
+
+## Next
+
+- [Beneficiaries](/guides/beneficiaries)
+- [Payouts](/guides/payouts)
+- [API reference — Corridors](/api-reference/corridors)

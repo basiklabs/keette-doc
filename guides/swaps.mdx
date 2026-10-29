@@ -1,0 +1,35 @@
+---
+title: "Swaps"
+description: "Exchange between your own currency books."
+icon: "shuffle"
+---
+
+A **swap** moves value between two books you own (for example USD → NGN) using a firm [FX quote](/guides/fx). No beneficiary is involved.
+
+## Sequence
+
+1. `POST /v1/fx/quotes` with `"purpose": "swap"`, `from`, `to`, and one amount
+2. `POST /v1/swaps` with that `quote_id` (and an idempotency key)
+3. Poll `GET /v1/swaps/{id}` or listen for swap webhooks
+
+```bash
+curl https://api.keette.com/v1/swaps \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "quote_id": "…",
+    "idempotency_key": "swap-usd-ngn-001"
+  }'
+```
+
+Both books must exist and the source book must have enough **available** to cover the debit.
+
+## Dev mode
+
+Firm partner quotes and swaps are refused in dashboard Dev. Use Live or your sandbox cloud environment when you need a real partner-backed swap.
+
+## Next
+
+- [FX](/guides/fx)
+- [Balances](/guides/balances)
+- [API reference — Swaps](/api-reference/swaps)
