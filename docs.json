@@ -20,7 +20,7 @@
   },
   "api": {
     "mdx": {
-      "server": "https://20b9-41-90-209-232.ngrok-free.app/v1"
+      "server": "https://api.keette.com/v1"
     },
     "playground": {
       "display": "interactive",
@@ -40,7 +40,7 @@
           {
             "group": "Getting started",
             "icon": "rocket",
-            "pages": ["quickstart", "index", "environments"]
+            "pages": ["index", "quickstart", "environments"]
           },
           {
             "group": "Auth",
@@ -156,7 +156,7 @@
       "anchors": [
         {
           "anchor": "Guides",
-          "href": "/quickstart",
+          "href": "/",
           "icon": "book-open"
         },
         {

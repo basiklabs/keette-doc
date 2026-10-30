@@ -16,7 +16,7 @@ The public API only accepts keys for **approved business** workspaces. Individua
 | Prefix | `sk_live_…` (live) or `sk_test_…` (sandbox) |
 | Expiry | Required. Maximum **90 days** from creation. |
 | Secret | Shown once at create. Prefix stays visible in the table. |
-| IP allowlist | Optional. Empty means any IP. `0.0.0.0/0` = any IPv4; `::/0` = any IPv6. Proxies (Hoppscotch, ngrok) often present IPv6 — an IPv4-only list will 403. |
+| IP allowlist | Optional. Empty means any IP. `0.0.0.0/0` = any IPv4; `::/0` = any IPv6. Clients behind IPv6 egress need `::/0` (or both) or requests will 403. |
 | Revoke | Immediate. In-flight requests fail on the next call. |
 
 ## Dashboard
@@ -27,9 +27,3 @@ Admins and developers can create keys and edit allowlists. Revoke may require a 
 curl https://api.keette.com/v1/me \
   -H "Authorization: Bearer sk_test_…"
 ```
-
-## Admin controls
-
-- **Per tenant:** turn Developers / API access on or off (`api_access`)
-- **Per key:** revoke from the customer admin API
-- **Global:** `PUBLIC_API_ENABLED` in system config — when off, every `/v1` call fails and new keys cannot be created

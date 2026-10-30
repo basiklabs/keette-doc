@@ -4,6 +4,12 @@ description: "Build on Keette’s public API — payments, balances, recipients,
 icon: "book-open"
 ---
 
+<img
+  src="/images/intro-banner.svg"
+  alt="Keette Developers — secure, connected payments API"
+  className="w-full rounded-2xl border border-border mb-8"
+/>
+
 Keette Developers is the home for the public HTTP API. Integrate payouts, collections, swaps, beneficiaries, and signed webhooks into your product.
 
 One base URL. Live or sandbox is chosen by your API key — not by a separate host.
@@ -16,13 +22,16 @@ One base URL. Live or sandbox is chosen by your API key — not by a separate ho
   <Card title="Quickstart" icon="rocket" href="/quickstart">
     Create a key, call `GET /v1/me`, and verify live vs test.
   </Card>
+  <Card title="Environments" icon="globe" href="/environments">
+    One host — `sk_live_…` vs `sk_test_…` picks the workspace.
+  </Card>
   <Card title="API keys" icon="key" href="/auth/api-keys">
     Expiry (max 90 days), optional IP allowlists, rotate safely.
   </Card>
-  <Card title="Payouts" icon="send" href="/guides/payouts">
+  <Card title="Payouts" icon="sack-dollar" href="/guides/payouts">
     Send from a book to a beneficiary.
   </Card>
-  <Card title="Payins" icon="download" href="/guides/payins">
+  <Card title="Payins" icon="money-simple-from-bracket" href="/guides/payins">
     Collect into your books from supported sources.
   </Card>
   <Card title="Webhooks" icon="webhook" href="/webhooks/overview">

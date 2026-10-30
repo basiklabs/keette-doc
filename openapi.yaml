@@ -11,8 +11,6 @@ info:
     name: Keette Support
     email: talk@keette.com
 servers:
-  - url: https://20b9-41-90-209-232.ngrok-free.app/v1
-    description: Local (ngrok)
   - url: https://api.keette.com/v1
     description: Production
 security:
