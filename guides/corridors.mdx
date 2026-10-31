@@ -4,12 +4,19 @@ description: "Discover payout schemes, currencies, and required beneficiary fiel
 icon: "route"
 ---
 
-**Corridors** are the catalog of how money can leave a book: bank rails, mobile money, wires, stablecoins, and more. Use them to drive your UI and to validate beneficiary payloads before create.
+**Corridors** are the catalog of how money can leave a book: bank rails, mobile money, wires, stablecoins, and more. Use them to drive your UI and to validate beneficiary payloads before create. Bank codes for a country come from a separate utility: `GET /v1/banks?country=…`.
 
 ## List
 
 ```bash
 curl https://api.keette.com/v1/corridors \
+  -H "Authorization: Bearer sk_test_…"
+```
+
+Optional `country` (ISO 3166-1 alpha-2, e.g. `NG`) returns only corridors that reach that destination. See [Country codes](/guides/country-codes).
+
+```bash
+curl "https://api.keette.com/v1/corridors?country=NG" \
   -H "Authorization: Bearer sk_test_…"
 ```
 
@@ -23,7 +30,7 @@ Each corridor typically includes:
 | `fields` | Required routing keys (`key` is camelCase, e.g. `bankCode`) |
 | `minMinor` / `maxMinor` | Amount bounds when set |
 
-The list response also includes top-level `relationships` codes you may send on beneficiaries.
+The list response also includes top-level `relationships` codes you may send on beneficiaries — see [Relationships & purposes](/guides/relationships-and-purposes).
 
 ## Using corridors
 

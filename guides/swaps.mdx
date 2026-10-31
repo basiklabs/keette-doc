@@ -22,7 +22,10 @@ curl https://api.keette.com/v1/swaps \
   }'
 ```
 
-Both books must exist and the source book must have enough **available** to cover the debit.
+Both `from` and `to` must already appear on `GET /v1/balances`. If the quote
+`to` currency is missing, quote and create reject with
+`you don't have a {currency} balance — add one before swapping into it`.
+The source book must have enough **available** to cover the debit.
 
 ## Dev mode
 

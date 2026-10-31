@@ -20,7 +20,7 @@
   },
   "api": {
     "mdx": {
-      "server": "https://api.keette.com/v1"
+      "server": "https://1178-41-90-137-132.ngrok-free.app/v1"
     },
     "playground": {
       "display": "interactive",
@@ -57,6 +57,9 @@
               "guides/payouts",
               "guides/balances",
               "guides/corridors",
+              "guides/country-codes",
+              "guides/money",
+              "guides/relationships-and-purposes",
               "guides/transactions",
               "guides/beneficiaries"
             ]
@@ -88,33 +91,39 @@
           {
             "group": "Account",
             "openapi": "openapi.yaml",
-            "pages": ["GET /me", "POST /ping", "GET /events", "GET /events/{id}"]
+            "pages": ["GET /me"]
           },
           {
-            "group": "Balances",
+            "group": "Utilities",
             "openapi": "openapi.yaml",
-            "pages": ["GET /balances"]
-          },
-          {
-            "group": "Transactions",
-            "openapi": "openapi.yaml",
-            "pages": ["GET /transactions/{id}", "GET /transactions"]
+            "pages": [
+              "GET /banks",
+              "GET /corridors",
+              {
+                "group": "Resolve",
+                "pages": [
+                  "GET /banks/ke",
+                  "GET /banks/resolve",
+                  "GET /banks/bic/{bic}"
+                ]
+              }
+            ]
           },
           {
             "group": "Beneficiaries",
             "openapi": "openapi.yaml",
             "pages": [
-              "GET /beneficiaries/{id}",
               "GET /beneficiaries",
               "POST /beneficiaries",
+              "GET /beneficiaries/{id}",
               "PATCH /beneficiaries/{id}",
               "POST /beneficiaries/{id}/archive"
             ]
           },
           {
-            "group": "Corridors",
+            "group": "Balances",
             "openapi": "openapi.yaml",
-            "pages": ["GET /corridors"]
+            "pages": ["GET /balances"]
           },
           {
             "group": "FX",
@@ -126,28 +135,38 @@
             "openapi": "openapi.yaml",
             "pages": [
               "GET /payouts/purposes",
-              "GET /payouts/{id}",
               "POST /payouts/fee",
               "POST /payouts",
+              "GET /payouts/{id}",
               "POST /payouts/{id}/cancel"
             ]
           },
           {
             "group": "Swaps",
             "openapi": "openapi.yaml",
-            "pages": ["GET /swaps/{id}", "POST /swaps"]
+            "pages": ["POST /swaps", "GET /swaps/{id}"]
           },
           {
             "group": "Payins",
             "openapi": "openapi.yaml",
             "pages": [
               "GET /payins/sources",
-              "GET /payins/{id}",
               "POST /payins/fee",
-              "POST /payins",
               "POST /payins/preview",
-              "POST /payins/prepare"
+              "POST /payins/prepare",
+              "POST /payins",
+              "GET /payins/{id}"
             ]
+          },
+          {
+            "group": "Transactions",
+            "openapi": "openapi.yaml",
+            "pages": ["GET /transactions", "GET /transactions/{id}"]
+          },
+          {
+            "group": "Webhooks",
+            "openapi": "openapi.yaml",
+            "pages": ["POST /ping", "GET /events", "GET /events/{id}"]
           }
         ]
       }

@@ -1,0 +1,79 @@
+---
+title: "Money amounts"
+description: "How Keette represents balances and amounts on the public API."
+icon: "coins"
+---
+
+All money on the **public API** and in **webhook `data`** uses the same rules.
+
+## Major units (6 decimal places)
+
+Money fields are JSON **numbers in major units**, always written with **exactly 6 decimal places** and a dot:
+
+| Ledger minors | Currency | API number |
+| ------------- | -------- | ---------- |
+| `2000000` | EUR (`scale` 2) | `20000.000000` |
+| `31` | USD | `0.310000` |
+| `1500000` | USDC (`scale` 6) | `1.500000` |
+
+Examples of fields: `available`, `held`, `amount`, `fee`, `transfer_fee`, `amount_from`, `amount_to`, …
+
+## Clear display string
+
+Every money field also has a **`clear_*` string** — comma-separated, scale-trimmed for reading:
+
+| Field | Clear key | Example |
+| ----- | --------- | ------- |
+| `available` | `clear_available` **and** `clear_balance` | `"20,000.00"` |
+| `held` | `clear_held` | `"0.00"` |
+| `amount` | `clear_amount` | `"50,000.00"` |
+| `fee` | `clear_fee` | `"0.31"` |
+
+Use `clear_*` for UI labels. Use the 6dp float for display math. Use `*_minor` when you need exact integer Ledger units.
+
+## Companion `*_minor`
+
+Each money field includes `<field>_minor` (Ledger integer). Prefer this for exact arithmetic and idempotent reconciliations.
+
+## Nested money objects
+
+Fee and money-movement responses group sides with a short `note` on each object:
+
+| Object | Typical keys | Meaning |
+| ------ | ------------ | ------- |
+| `payout_fee.source` | `balance_id`, `amount`, `transfer_fee`, `total`, `available` | What leaves your book |
+| `payout_fee.recipient` | `beneficiary_id`, `amount` | What they receive |
+| `payin.payer` / `payin.credit` | `amount` | What the payer sends / what credits your book |
+
+Always read the `note` field on each nested object.
+
+## Request bodies
+
+Send amounts as **major-unit numbers** (same as responses), e.g. `"amount": 500.000000` for five hundred units.
+
+For exact Ledger control you may still send `"amount_minor": 50000` instead (integer minors). If both are present, `*_minor` wins.
+
+## Example balance row
+
+```json
+{
+  "object": "balance",
+  "currency": "EUR",
+  "available": 20000.000000,
+  "available_minor": 2000000,
+  "clear_available": "20,000.00",
+  "clear_balance": "20,000.00",
+  "held": 0.000000,
+  "held_minor": 0,
+  "clear_held": "0.00",
+  "scale": 2,
+  "livemode": true,
+  "environment": "live"
+}
+```
+
+## Next
+
+- [Balances](/guides/balances)
+- [Webhooks — money in data](/webhooks/overview#money-in-data)
+- [Payouts](/guides/payouts)

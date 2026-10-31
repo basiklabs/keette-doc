@@ -13,7 +13,7 @@ curl https://api.keette.com/v1/balances \
   -H "Authorization: Bearer sk_live_…"
 ```
 
-Amounts are **Ledger minor units** (cents, kobo, …). The response includes the currency code and scales so you can format for display.
+Amounts are **major-unit floats with 6 decimal places** (e.g. `20000.000000`), plus `clear_balance` / `clear_held` for comma-separated display and `*_minor` for exact Ledger integers. See [Money amounts](/guides/money).
 
 ## Live vs sandbox
 

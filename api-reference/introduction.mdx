@@ -7,24 +7,29 @@ This tab is the **API reference** — endpoint playgrounds generated from [`open
 
 Authenticate with `Authorization: Bearer sk_live_…` or `sk_test_…`. See [Authentication](/auth/overview) and [Environments](/environments) in Guides.
 
-Playground requests use the production base URL:
+Playground default base URL (local tunnel for now):
 
 ```text
-https://api.keette.com/v1
+https://1178-41-90-137-132.ngrok-free.app/v1
 ```
 
-Live vs sandbox is selected by your API key, not by a separate host.
+Production remains `https://api.keette.com/v1`. Live vs sandbox is selected by your API key, not by a separate host.
+
+## Suggested order
+
+Build a beneficiary → payout flow with **Utilities** first (`scheme` from corridors, `bank_code` from banks), then Beneficiaries, then Payouts.
 
 ## Available now
 
 | Area | Endpoints |
 | ---- | --------- |
-| Account | [Me](/api-reference/account/me), [Ping](/api-reference/events/ping), [Events](/api-reference/events/events) (`GET /v1/events`, `GET /v1/events/{id}`) |
+| Account | [Me](/api-reference/account/me) |
+| Utilities | [Banks](/api-reference/utilities/banks), [Corridors](/api-reference/utilities/corridors), Resolve → [Kenya](/api-reference/utilities/resolve-kenya), [Nigeria](/api-reference/utilities/resolve-nigeria), [Swift Code](/api-reference/utilities/resolve-swift-code) |
+| Beneficiaries | [List](/api-reference/beneficiaries/beneficiaries), [Create](/api-reference/beneficiaries/create-beneficiary), [Get](/api-reference/beneficiaries/beneficiary), [Update](/api-reference/beneficiaries/update-beneficiary), [Archive](/api-reference/beneficiaries/archive-beneficiary) |
 | Balances | [Balances](/api-reference/balances/balances) |
-| Transactions | [Transaction](/api-reference/transactions/transaction), [Transactions](/api-reference/transactions/transactions) |
-| Beneficiaries | [Beneficiary](/api-reference/beneficiaries/beneficiary), [Beneficiaries](/api-reference/beneficiaries/beneficiaries) |
-| Corridors | [Corridors](/api-reference/catalog/corridors) |
 | FX | [FX rate](/api-reference/fx/fx-rate), [FX quote](/api-reference/fx/fx-quote) |
-| Payouts | [Create](/api-reference/payouts/create-payout), [Fee](/api-reference/payouts/payout-fee), [Purposes](/api-reference/payouts/payout-purposes), [Get](/api-reference/payouts/get-payout), [Cancel](/api-reference/payouts/cancel-payout) |
+| Payouts | [Purposes](/api-reference/payouts/payout-purposes), [Fee](/api-reference/payouts/payout-fee), [Create](/api-reference/payouts/create-payout), [Get](/api-reference/payouts/get-payout), [Cancel](/api-reference/payouts/cancel-payout) |
 | Swaps | [Create](/api-reference/swaps/create-swap), [Get](/api-reference/swaps/get-swap) |
 | Payins | [Sources](/api-reference/payins/sources), [Fee](/api-reference/payins/payin-fee), [Preview](/api-reference/payins/payin-preview), [Prepare](/api-reference/payins/prepare-payin), [Create](/api-reference/payins/create-payin), [Get](/api-reference/payins/get-payin) |
+| Transactions | [Transactions](/api-reference/transactions/transactions), [Transaction](/api-reference/transactions/transaction) |
+| Webhooks | [Ping](/api-reference/webhooks/ping), [Events](/api-reference/webhooks/events), [Event](/api-reference/webhooks/event) |

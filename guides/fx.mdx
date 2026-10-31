@@ -20,9 +20,14 @@ curl "https://api.keette.com/v1/fx/rate?from=USD&to=NGN" \
 
 Safe for UI previews. Do **not** treat it as a lock — amounts can move before you create a quote.
 
+When the partner rail cannot price a pair, Keette may return a market
+failover rate with `indicative: true` and
+`disclaimer: "Rates are indicative and not final."` Firm quotes
+(`POST /v1/fx/quotes`) never use that failover.
+
 ## Firm quote
 
-Send exactly one of `amount_from` or `amount_to` (Ledger minor units):
+Send exactly one of `amount_from` or `amount_to` (major units; or `*_minor` for Ledger integers):
 
 ```bash
 curl https://api.keette.com/v1/fx/quotes \
@@ -31,15 +36,23 @@ curl https://api.keette.com/v1/fx/quotes \
   -d '{
     "from": "USD",
     "to": "NGN",
-    "amount_from": 10000,
-    "purpose": "swap"
+    "amount_from": 100
   }'
 ```
 
-- Omit `purpose` (or leave empty) for a **payout** quote
-- Set `"purpose": "swap"` when the quote will go to `POST /v1/swaps`
+`purpose` classifies the lock (returned on the quote):
 
-Pass the returned quote `id` as `quote_id` on the payout or swap. Quotes expire — create the money movement promptly.
+| Purpose | Use |
+| ------- | --- |
+| `payout` (default if omitted) | `POST /v1/payouts` |
+| `swap` / `transfer` | `POST /v1/swaps` (own books) |
+| `mint` | Stablecoin / mint conversion into an own book |
+| `otc` | OTC desk conversion into an own book |
+
+- Same-currency payouts: set `from` == `to` for an identity quote (rate `1`)
+- For `swap` / `transfer` / `mint` / `otc`, both currencies must already exist on `GET /v1/balances`
+
+Pass the returned quote `id` as `quote_id` on `POST /v1/payouts` or `POST /v1/swaps`. **Create payout always requires `quote_id`** — amounts are taken from the quote, not from the create body. Quotes expire — create the money movement promptly.
 
 ## Dev mode
 

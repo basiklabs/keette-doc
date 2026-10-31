@@ -8,9 +8,13 @@ A **beneficiary** is a saved payout destination (bank account, mobile money, sta
 
 ## Flow
 
-1. Inspect [corridors](/guides/corridors) for the scheme and required routing field keys
-2. `POST /v1/beneficiaries` with those fields
-3. Pass `beneficiary_id` to [payouts](/guides/payouts)
+1. `GET /v1/corridors` (optional `?country=NG`) — pick a `scheme` and note required `fields[].key` values for `routing`
+2. For local bank rails (e.g. `ng_nip`): `GET /v1/banks?country=NG` — use a bank `code` as `routing.bank_code`
+3. Optional: `GET /v1/banks/resolve` to confirm the account name before create
+4. `POST /v1/beneficiaries` with those fields
+5. Pass `beneficiary_id` to [payouts](/guides/payouts)
+
+See API reference **Utilities → Resolve** for Nigeria account lookup, Swift/BIC lookup (no bank code), and Kenya paybill banks. Country query values are [ISO alpha-2 codes](/guides/country-codes).
 
 ```bash
 curl https://api.keette.com/v1/beneficiaries \
@@ -24,6 +28,7 @@ curl https://api.keette.com/v1/beneficiaries \
     "currency": "NGN",
     "country": "NG",
     "scheme": "ng_nip",
+    "relationship": "supplier",
     "holder_name": "Ada Okoye",
     "address": {
       "line_1": "12 Admiralty Way",
@@ -31,11 +36,13 @@ curl https://api.keette.com/v1/beneficiaries \
       "country": "NG"
     },
     "routing": {
-      "bank_code": "058",
-      "account_number": "0123456789"
+      "bank_code": "044",
+      "account_number": "0690000031"
     }
   }'
 ```
+
+Sandbox NIP payouts only settle when the beneficiary is the partner test account: Access Bank (`044`) / `0690000031` (holder name resolves to **Keette Sandbox Test**). Use that pair when trying create + payout end-to-end with a test key.
 
 ### Required shape
 
@@ -48,6 +55,7 @@ curl https://api.keette.com/v1/beneficiaries \
 | `address` | `line_1`, `city`, and `country` required |
 | `currency` / `scheme` | Must match an offer from `GET /corridors` |
 | `routing` | Keys match corridor field `key` values (e.g. `bankCode`). Snake_case aliases such as `bank_code` are accepted |
+| `relationship` | Optional code from [Relationships & purposes](/guides/relationships-and-purposes) (also on `GET /corridors`) |
 
 `holder_name` is optional; when omitted it defaults to the individual or business name.
 
@@ -60,6 +68,7 @@ List with `GET /v1/beneficiaries`. Fetch one with `GET /v1/beneficiaries/{id}`.
 
 ## Next
 
+- [Relationships & purposes](/guides/relationships-and-purposes) — allowed `relationship` codes
 - [Corridors](/guides/corridors) — schemes and field requirements
 - [Payouts](/guides/payouts) — send to a beneficiary
 - [API reference](/api-reference/beneficiaries) — full request shapes

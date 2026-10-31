@@ -15,33 +15,53 @@ A **payout** debits one of your books and pays a [beneficiary](/guides/beneficia
   <Step title="Pick corridor + beneficiary">
     [Corridors](/guides/corridors) → create or reuse a [beneficiary](/guides/beneficiaries).
   </Step>
-  <Step title="Optional FX quote">
-    Cross-currency sends: [firm quote](/guides/fx) then pass `quote_id`.
+  <Step title="Lock a firm quote">
+    `POST /v1/fx/quotes` with `from` (source balance currency), `to` (beneficiary
+    currency), and exactly one of `amount_from` / `amount_to`. Same-currency
+    sends use `from` == `to` (identity quote, rate `1`).
   </Step>
-  <Step title="Fee preview">
-    `POST /v1/payouts/fee` with the same shape you will send.
+  <Step title="Fee preview (optional)">
+    `POST /v1/payouts/fee` with `balance_id`, `beneficiary_id`, and the
+    unexpired `quote_id` (or `amount` / `recipient_amount` for an estimate).
   </Step>
   <Step title="Create">
-    `POST /v1/payouts` — returns id and status. Poll `GET /v1/payouts/{id}` or wait for webhooks.
+    `POST /v1/payouts` with `balance_id`, `beneficiary_id`, and `quote_id` —
+    amounts come from the quote. Poll `GET /v1/payouts/{id}` or wait for webhooks.
   </Step>
 </Steps>
 
 ```bash
+# 1. Lock amounts
+curl https://api.keette.com/v1/fx/quotes \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "from": "EUR",
+    "to": "NGN",
+    "amount_to": 10000
+  }'
+
+# 2. Create from that quote
 curl https://api.keette.com/v1/payouts \
   -H "Authorization: Bearer sk_test_…" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: pay-2026-04-01-ada" \
   -d '{
     "beneficiary_id": "…",
-    "amount": 50000,
-    "currency": "NGN",
+    "balance_id": "…",
+    "quote_id": "…",
     "purpose": "salaries"
   }'
 ```
 
 Always send a stable **`Idempotency-Key` header** (8–100 characters) so retries do not double-send. Do not put the key in the JSON body.
 
-`purpose` is required. Use a code from `GET /v1/payouts/purposes` (for example `salaries`, `supplier_goods`, `services`). Business workspaces cannot use `family_support`.
+`quote_id` is **required**. Do not send `amount` on create — the quote supplies both the debit and what the beneficiary receives. Keette checks:
+
+- quote `from` matches the source `balance_id` currency
+- quote `to` matches the beneficiary currency
+
+`purpose` is required. Use an exact code from [Relationships & purposes](/guides/relationships-and-purposes) (or `GET /v1/payouts/purposes`). Business workspaces cannot use `family_support`. When `purpose` is `other`, send a non-empty `note`.
 
 ## Cancel
 
@@ -49,10 +69,14 @@ Always send a stable **`Idempotency-Key` header** (8–100 characters) so retrie
 
 ## Purposes
 
-`GET /v1/payouts/purposes` lists allowed purpose codes and document threshold rules for this workspace.
+Full static list: [Relationships & purposes](/guides/relationships-and-purposes).
+
+`GET /v1/payouts/purposes` returns the codes allowed for **this** workspace (drops `family_support` for business) plus document threshold rules.
 
 ## Next
 
+- [FX](/guides/fx) — firm quotes
+- [Relationships & purposes](/guides/relationships-and-purposes) — purpose codes
 - [Webhooks](/webhooks/overview) — `event.payout.*`
 - [Transactions](/guides/transactions) — unified history
 - [API reference — Payouts](/api-reference/payouts)

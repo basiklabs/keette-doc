@@ -11,6 +11,8 @@ info:
     name: Keette Support
     email: talk@keette.com
 servers:
+  - url: https://1178-41-90-137-132.ngrok-free.app/v1
+    description: Local tunnel (ngrok → core :8080)
   - url: https://api.keette.com/v1
     description: Production
 security:
@@ -18,6 +20,11 @@ security:
 tags:
   - name: Account
     description: Identity for the authenticating API key
+  - name: Utilities
+    description: |
+      Lookup helpers for building beneficiaries and payouts — corridors
+      (schemes + routing field keys), bank directory codes, account resolve,
+      and SWIFT/BIC lookup.
   - name: Balances
     description: Wallet books
   - name: Beneficiaries
@@ -26,16 +33,14 @@ tags:
     description: Unified transaction index
   - name: FX
     description: Indicative rates and firm quotes
-  - name: Catalog
-    description: Payout corridors and relationships
   - name: Payouts
     description: Send money to a beneficiary
   - name: Payins
     description: Collect money into your books
   - name: Swaps
     description: FX between your own books
-  - name: Events
-    description: Durable event log for webhook polling
+  - name: Webhooks
+    description: Durable event log, ping, and webhook delivery helpers
 paths:
   /me:
     get:
@@ -68,7 +73,7 @@ paths:
   /events:
     get:
       operationId: listEvents
-      tags: [Events]
+      tags: [Webhooks]
       summary: Events
       description: |
         Returns durable events for the environment bound to the API key
@@ -109,7 +114,7 @@ paths:
   /events/{id}:
     get:
       operationId: getEvent
-      tags: [Events]
+      tags: [Webhooks]
       summary: Event
       description: |
         Returns one durable event by id for the environment bound to the API
@@ -137,7 +142,7 @@ paths:
   /ping:
     post:
       operationId: ping
-      tags: [Events]
+      tags: [Webhooks]
       summary: Ping
       description: |
         Persists `event.ping` and queues a delivery when the env webhook is
@@ -156,9 +161,44 @@ paths:
       operationId: listBalances
       tags: [Balances]
       summary: Balances
+      description: |
+        Books for this workspace. Money fields are major-unit floats with 6
+        decimal places, plus `clear_balance` / `clear_held` and `*_minor`.
+        See [Money amounts](/guides/money).
       responses:
         "200":
           description: Balance list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [list]
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Balance"
+              examples:
+                books:
+                  value:
+                    object: list
+                    data:
+                      - object: balance
+                        id: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
+                        currency: EUR
+                        available: 20000.000000
+                        available_minor: 2000000
+                        clear_available: "20,000.00"
+                        clear_balance: "20,000.00"
+                        held: 0.000000
+                        held_minor: 0
+                        clear_held: "0.00"
+                        scale: 2
+                        livemode: true
+                        environment: live
+                        details_available: false
         "401":
           $ref: "#/components/responses/Unauthorized"
   /transactions:
@@ -169,7 +209,8 @@ paths:
       description: |
         List activity. Each row includes `counterparty` (with `id` when the
         recipient is a saved beneficiary) and `quote.id` when a firm FX quote
-        was used. Amounts are Ledger minor units with `scale`.
+        was used. Amounts follow [Money amounts](/guides/money) (6dp floats +
+        `clear_*` + `*_minor`).
       parameters:
         - name: limit
           in: query
@@ -259,7 +300,9 @@ paths:
       description: |
         Save a payout recipient. Scheme and routing keys must match a corridor
         from `GET /corridors`. Email and a street/city/country address are
-        required. Emits `event.beneficiary.created`.
+        required. Optional `relationship` must be a code from
+        [Relationships & purposes](/guides/relationships-and-purposes)
+        (also returned on `GET /corridors`). Emits `event.beneficiary.created`.
       requestBody:
         required: true
         content:
@@ -277,14 +320,15 @@ paths:
                   currency: NGN
                   country: NG
                   scheme: ng_nip
+                  relationship: supplier
                   holder_name: Ada Okoye
                   address:
                     line_1: 12 Admiralty Way
                     city: Lagos
                     country: NG
                   routing:
-                    bank_code: "058"
-                    account_number: "0123456789"
+                    bank_code: "044"
+                    account_number: "0690000031"
       responses:
         "200":
           description: Created beneficiary
@@ -315,6 +359,8 @@ paths:
       summary: Update Beneficiary
       description: |
         Update mutable fields only (nickname, email, relationship, address).
+        `relationship` must be a code from
+        [Relationships & purposes](/guides/relationships-and-purposes).
         Routing and scheme cannot change — create a new beneficiary instead.
       parameters:
         - name: id
@@ -360,11 +406,296 @@ paths:
   /corridors:
     get:
       operationId: listCorridors
-      tags: [Catalog]
+      tags: [Utilities]
       summary: Corridors
+      description: |
+        Payout schemes available to this workspace. Use each offer's `scheme`
+        on `POST /beneficiaries`, and its `fields[].key` values as `routing`
+        keys (camelCase; snake_case aliases accepted). Also returns allowed
+        `relationships` codes — full list in
+        [Relationships & purposes](/guides/relationships-and-purposes).
+
+        Optional `country` is an **ISO 3166-1 alpha-2** code (**2 letters**) —
+        e.g. `NG`. When set, only corridors that reach that country are
+        returned (see [Country codes](/guides/country-codes)).
+      parameters:
+        - name: country
+          in: query
+          required: false
+          description: |
+            ISO 3166-1 alpha-2 destination country. Omit to list every corridor.
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 2
+            pattern: "^[A-Za-z]{2}$"
+          example: NG
       responses:
         "200":
           description: Corridor catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [list]
+                  country:
+                    type: string
+                    description: Echoed when the `country` query was set.
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  relationships:
+                    type: array
+                    items:
+                      type: string
+              examples:
+                ng:
+                  summary: Filtered to Nigeria
+                  value:
+                    object: list
+                    country: NG
+                    data:
+                      - scheme: ng_nip
+                        label: Nigerian bank transfer
+                        method: bank
+                        currencies: [NGN]
+                        countries: [NG]
+                        fields:
+                          - key: bankCode
+                            label: Bank
+                            kind: bank
+                          - key: accountNumber
+                            label: Account number
+                            kind: account
+                    relationships:
+                      [
+                        vendor,
+                        supplier,
+                        contractor,
+                        employee,
+                        customer,
+                        partner,
+                        family,
+                        self,
+                        other,
+                      ]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /banks:
+    get:
+      operationId: listBanks
+      tags: [Utilities]
+      summary: Banks
+      description: |
+        Bank directory for a country. Use each bank's `code` as
+        `routing.bank_code` (or `bankCode`) when creating a beneficiary on a
+        local bank corridor (e.g. `ng_nip`).
+
+        `country` is an **ISO 3166-1 alpha-2** code (**2 letters**, not 3) —
+        e.g. Nigeria is `NG` (not `NGA`). See the full code list in
+        [Country codes](/guides/country-codes). Today the directory is
+        populated for Nigeria (`NG`); other codes may return an empty list
+        until that country's banks are synced.
+      parameters:
+        - name: country
+          in: query
+          required: true
+          description: |
+            ISO 3166-1 alpha-2 country code (**2 letters**). Full list:
+            [Country codes](/guides/country-codes). Example: `NG`.
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 2
+          example: NG
+      responses:
+        "200":
+          description: Bank list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object:
+                    type: string
+                    enum: [list]
+                  country:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Bank"
+              examples:
+                ng:
+                  value:
+                    object: list
+                    country: NG
+                    data:
+                      - object: bank
+                        country: NG
+                        currency: NGN
+                        code: "058"
+                        name: Guaranty Trust Bank
+                      - object: bank
+                        country: NG
+                        currency: NGN
+                        code: "044"
+                        name: Access Bank
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /banks/ke:
+    get:
+      operationId: resolveKenya
+      tags: [Utilities]
+      summary: Resolve Kenya
+      description: |
+        Kenya bank and deposit-taking MFI catalog (M-Pesa → bank paybill codes).
+        Omit filters to list all. Pass `code` (paybill) and/or `name` to match
+        one or more entries. Use `code` as `routing.bank_code` on `ke_eft`
+        beneficiaries.
+      parameters:
+        - name: code
+          in: query
+          required: false
+          description: |
+            Paybill / bank code (exact). Aliases `bank_code` and `bankCode`.
+          schema: { type: string, example: "247247" }
+        - name: name
+          in: query
+          required: false
+          description: |
+            Case-insensitive name substring. Alias `q`.
+          schema: { type: string, example: Equity }
+      responses:
+        "200":
+          description: Matching Kenya banks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: { type: string, enum: [list] }
+                  country: { type: string, example: KE }
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+              examples:
+                equity:
+                  value:
+                    object: list
+                    country: KE
+                    data:
+                      - object: bank
+                        country: KE
+                        currency: KES
+                        code: "247247"
+                        name: Equity Bank
+                        kind: bank
+                        ussd: "*247#"
+                all:
+                  summary: Full catalog when no filters
+                  value:
+                    object: list
+                    country: KE
+                    data:
+                      - object: bank
+                        country: KE
+                        currency: KES
+                        code: "522522"
+                        name: KCB
+                        kind: bank
+                        ussd: "*522#"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No bank matched the filters
+  /banks/resolve:
+    get:
+      operationId: resolveBank
+      tags: [Utilities]
+      summary: Resolve Nigeria
+      description: |
+        Looks up the registered account holder name for a Nigerian bank account
+        using a bank code from `GET /banks?country=NG`. Capped per workspace.
+      parameters:
+        - name: country
+          in: query
+          required: true
+          description: |
+            ISO 3166-1 alpha-2 (**2 letters**). Same codes as `GET /banks`
+            ([Country codes](/guides/country-codes)).
+          schema: { type: string, minLength: 2, maxLength: 2, example: NG }
+        - name: bank_code
+          in: query
+          required: true
+          description: Code from `GET /banks` (`bankCode` alias accepted).
+          schema: { type: string, example: "044" }
+        - name: account_number
+          in: query
+          required: true
+          description: |
+            Bank account number for that corridor (`accountNumber` alias
+            accepted). Format depends on the country/rail — not limited to a
+            single national scheme.
+          schema: { type: string, example: "0690000031" }
+      responses:
+        "200":
+          description: Resolved account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankResolve"
+              examples:
+                ok:
+                  value:
+                    object: bank_resolve
+                    account_number: "0690000031"
+                    account_name: Keette Sandbox Test
+                    bank_code: "044"
+                    bank_name: Access Bank
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /banks/bic/{bic}:
+    get:
+      operationId: getBankBic
+      tags: [Utilities]
+      summary: Resolve Swift Code
+      description: |
+        Looks up a SWIFT/BIC (no bank code required) in the global public
+        registry and returns bank name, country, and address when known.
+        Same helper the dashboard uses when creating wire beneficiaries.
+        `found=false` is not an error — the customer can still type details.
+      parameters:
+        - name: bic
+          in: path
+          required: true
+          description: 8 or 11 character SWIFT / BIC (any country).
+          schema: { type: string, example: NWBKGB2L }
+      responses:
+        "200":
+          description: BIC lookup
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankBic"
+              examples:
+                found:
+                  value:
+                    object: bank_bic
+                    bic: NWBKGB2L
+                    country: GB
+                    found: true
+                    bank_name: NATIONAL WESTMINSTER BANK PUBLIC LIMITED COMPANY
+                    address:
+                      city: LONDON
+                      country: GB
         "401":
           $ref: "#/components/responses/Unauthorized"
   /fx/rate:
@@ -372,6 +703,11 @@ paths:
       operationId: getFxRate
       tags: [FX]
       summary: FX Rate
+      description: |
+        Indicative mid-market rate for UI estimates. Not a lock — use
+        `POST /fx/quotes` before moving money. When the partner cannot price
+        the pair, a market failover may return with `disclaimer` set to
+        "Rates are indicative and not final."
       parameters:
         - name: from
           in: query
@@ -386,6 +722,21 @@ paths:
       responses:
         "200":
           description: Rate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FxRate"
+              example:
+                data:
+                  from: NGN
+                  to: KES
+                  rate: "0.096585"
+                  asOf: "2026-10-31T07:00:00Z"
+                  indicative: true
+                  disclaimer: Rates are indicative and not final.
         "401":
           $ref: "#/components/responses/Unauthorized"
   /fx/quotes:
@@ -394,9 +745,12 @@ paths:
       tags: [FX]
       summary: FX Quote
       description: |
-        Lock a firm rate. Use `purpose: swap` for internal transfers between
-        your books, then pass the returned `id` as `quote_id` to `POST /swaps`.
-        Omit purpose (or leave empty) for a payout quote.
+        Lock a firm rate (and amounts). Pass the returned `id` as `quote_id`
+        to `POST /payouts` (required) or `POST /swaps`. Set `purpose` to
+        classify the lock (`payout`, `swap`, `transfer`, `mint`, `otc`).
+        Same-currency payouts: set `from` equal to `to` for an identity
+        quote (rate `1`). For `swap` / `transfer` / `mint` / `otc`, both
+        currencies must already exist on `GET /balances`.
       requestBody:
         required: true
         content:
@@ -414,34 +768,68 @@ paths:
                   description: Destination book currency.
                   example: NGN
                 amount_from:
-                  type: integer
+                  type: number
+                  format: double
                   description: |
-                    Source amount in Ledger minor units (cents/kobo). Set exactly
-                    one of `amount_from` or `amount_to`.
-                  example: 10000
-                amount_to:
+                    Source amount in **major units**. Set exactly one of
+                    `amount_from` or `amount_to`. Optional `amount_from_minor`
+                    for exact Ledger integers. See [Money amounts](/guides/money).
+                  example: 100
+                amount_from_minor:
                   type: integer
-                  description: "Destination amount in Ledger minor units. Set exactly one of `amount_from` or `amount_to`."
+                  description: Exact Ledger minor units for `amount_from`.
+                amount_to:
+                  type: number
+                  format: double
+                  description: Destination amount in major units. Set exactly one of `amount_from` or `amount_to`.
+                amount_to_minor:
+                  type: integer
+                  description: Exact Ledger minor units for `amount_to`.
                 purpose:
                   type: string
-                  enum: [swap]
+                  enum: [payout, swap, transfer, mint, otc]
                   description: |
-                    Omit for a payout quote. Set to `swap` when the quote will be
-                    passed to `POST /swaps`.
+                    Why this quote is locked.
+                    - `payout` (default if omitted) — pass to `POST /payouts`
+                    - `swap` / `transfer` — pass to `POST /swaps` (own books)
+                    - `mint` — stablecoin / mint conversion into an own book
+                    - `otc` — OTC desk conversion into an own book
             examples:
               swap:
-                summary: Quote for an internal transfer
+                summary: Quote for an internal swap
                 value:
                   from: USD
                   to: NGN
-                  amount_from: 10000
+                  amount_from: 100
                   purpose: swap
+              transfer:
+                summary: Quote for a book transfer
+                value:
+                  from: EUR
+                  to: GBP
+                  amount_from: 250
+                  purpose: transfer
+              mint:
+                summary: Quote for a mint conversion
+                value:
+                  from: USD
+                  to: USDC
+                  amount_from: 1000
+                  purpose: mint
+              otc:
+                summary: Quote for an OTC conversion
+                value:
+                  from: USD
+                  to: NGN
+                  amount_to: 5000000
+                  purpose: otc
               payout:
                 summary: Quote for a cross-currency payout
                 value:
                   from: USD
                   to: NGN
-                  amount_from: 10000
+                  amount_from: 100
+                  purpose: payout
       responses:
         "200":
           description: Firm quote
@@ -458,6 +846,10 @@ paths:
                     type: string
                     format: uuid
                     description: "Firm quote id — pass as `quote_id` to payouts or swaps."
+                  purpose:
+                    type: string
+                    enum: [payout, swap, transfer, mint, otc]
+                    description: Purpose locked on the quote.
                   from:
                     type: string
                     description: Source currency.
@@ -509,9 +901,16 @@ paths:
       summary: Create Payout
       description: |
         Create and authorise a send in one step. The API key replaces the
-        workspace PIN. Requires `Idempotency-Key`. Cross-currency sends need
-        `quote_id` from `POST /fx/quotes`. If maker-checker applies, status is
+        workspace PIN. Requires `Idempotency-Key` and a firm `quote_id` from
+        `POST /fx/quotes` — amounts come from the quote (do not send
+        `amount`). The quote `from` currency must match the source
+        `balance_id` currency; the quote `to` currency must match the
+        beneficiary currency. Same-currency sends use an identity quote
+        (`from` == `to`, rate `1`). If maker-checker applies, status is
         `pending_approval` until a second admin approves in the dashboard.
+        `purpose` must be a code from
+        [Relationships & purposes](/guides/relationships-and-purposes)
+        (or `GET /payouts/purposes`).
       parameters:
         - name: Idempotency-Key
           in: header
@@ -532,20 +931,19 @@ paths:
               $ref: "#/components/schemas/CreatePayoutRequest"
             examples:
               same_currency:
-                summary: Same-currency send (NGN → NGN)
+                summary: Same-currency send (quote from=to)
                 value:
                   beneficiary_id: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
-                  currency: NGN
-                  amount: 5000000
+                  balance_id: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
                   purpose: supplier_goods
                   invoice_ref: INV-2026-042
                   note: October supplier invoice
+                  quote_id: "e6bd10ee-6e53-4aaa-9cd0-a2bb980cf73e"
               cross_currency:
-                summary: Cross-currency (needs quote_id)
+                summary: Cross-currency (firm FX quote)
                 value:
                   beneficiary_id: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
-                  currency: USD
-                  amount: 10000
+                  balance_id: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
                   purpose: services
                   invoice_ref: INV-2026-042
                   quote_id: "e6bd10ee-6e53-4aaa-9cd0-a2bb980cf73e"
@@ -585,7 +983,14 @@ paths:
       operationId: payoutFee
       tags: [Payouts]
       summary: Payout Fee
-      description: Estimate transfer fee before creating a payout.
+      description: |
+        Estimate transfer fee before creating a payout. `balance_id` is the
+        source book (`GET /balances`); `beneficiary_id` is where money goes.
+        Provide at least one of `amount`, `recipient_amount`, or an unexpired
+        `quote_id`. `recipient_amount` is what the beneficiary receives; when
+        only that is set, Keette estimates how much to debit from the balance.
+        Refuses with `insufficient_funds` when available balance cannot cover
+        the gross send (same rule as create).
       requestBody:
         required: true
         content:
@@ -597,8 +1002,20 @@ paths:
                 summary: Fee for a NGN send
                 value:
                   beneficiary_id: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
-                  currency: NGN
-                  amount: 5000000
+                  balance_id: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
+                  amount: 50000
+              recipient_side:
+                summary: Cross-currency from what the beneficiary gets
+                value:
+                  beneficiary_id: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
+                  balance_id: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
+                  recipient_amount: 50000
+              with_quote:
+                summary: Locked FX quote
+                value:
+                  beneficiary_id: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
+                  balance_id: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
+                  quote_id: "e6bd10ee-6e53-4aaa-9cd0-a2bb980cf73e"
       responses:
         "200":
           description: Fee quote
@@ -610,12 +1027,39 @@ paths:
                 fee:
                   value:
                     object: payout_fee
-                    currency: NGN
-                    amount: 5000000
-                    transfer_fee: 10000
-                    total: 5000000
-                    exact: false
-                    scale: 2
+                    note: "Fee estimate: `source` is what leaves your book; `recipient` is what they get."
+                    exact: true
+                    exact_note: Same-currency or firm quote — amounts match what create will hold.
+                    source:
+                      object: payout_fee_source
+                      note: "Book that will be debited. `total` is what leaves the balance; `transfer_fee` is carved from that total (not added on top)."
+                      balance_id: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
+                      currency: EUR
+                      scale: 2
+                      available: 100.000000
+                      available_minor: 10000
+                      clear_available: "100.00"
+                      amount: 6.910000
+                      amount_minor: 691
+                      clear_amount: "6.91"
+                      transfer_fee: 0.040000
+                      transfer_fee_minor: 4
+                      clear_transfer_fee: "0.04"
+                      total: 6.910000
+                      total_minor: 691
+                      clear_total: "6.91"
+                      min_payment: 0.000000
+                      min_payment_minor: 0
+                      clear_min_payment: "0.00"
+                    recipient:
+                      object: payout_fee_recipient
+                      note: What the beneficiary receives in their currency (from beneficiary_id).
+                      beneficiary_id: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
+                      currency: NGN
+                      scale: 2
+                      amount: 10000.000000
+                      amount_minor: 1000000
+                      clear_amount: "10,000.00"
         "401":
           $ref: "#/components/responses/Unauthorized"
   /payouts/purposes:
@@ -623,7 +1067,11 @@ paths:
       operationId: payoutPurposes
       tags: [Payouts]
       summary: Purposes
-      description: Allowed purpose codes (and document rules) for this workspace.
+      description: |
+        Allowed purpose codes (and document rules) for this workspace.
+        Static list with labels:
+        [Relationships & purposes](/guides/relationships-and-purposes).
+        Business workspaces omit `family_support`.
       responses:
         "200":
           description: Purpose rules
@@ -750,7 +1198,9 @@ paths:
       description: |
         Move funds between your own books using a firm quote from
         `POST /fx/quotes` with `purpose: swap`. Requires `Idempotency-Key`.
-        The API key replaces the workspace PIN.
+        The API key replaces the workspace PIN. Both quote `from` and `to`
+        currencies must already exist on `GET /balances`; otherwise the
+        request is rejected (`parameter_invalid`).
       parameters:
         - name: Idempotency-Key
           in: header
@@ -788,15 +1238,26 @@ paths:
                 processing:
                   value:
                     object: swap
+                    note: "Book-to-book transfer. `from` is the debit; `to` is the credit."
                     id: "14d2759d-c6b1-5e5f-85b2-af84bc650f57"
                     status: processing
                     origin: keette
-                    from: USD
-                    to: NGN
-                    amount_from: 10000
-                    amount_to: 1550000
-                    scale_from: 2
-                    scale_to: 2
+                    from:
+                      object: swap_from
+                      note: Source book — what leaves this balance.
+                      currency: USD
+                      scale: 2
+                      amount: 100
+                      amount_minor: 10000
+                      clear_amount: "100.00"
+                    to:
+                      object: swap_to
+                      note: Destination book — what is credited after conversion.
+                      currency: NGN
+                      scale: 2
+                      amount: 15500
+                      amount_minor: 1550000
+                      clear_amount: "15,500.00"
                     fx_rate: "155.00"
                     quote_id: "e6bd10ee-6e53-4aaa-9cd0-a2bb980cf73e"
                     stan: SWP-2610-ABCDEF12
@@ -826,15 +1287,26 @@ paths:
                 completed:
                   value:
                     object: swap
+                    note: "Book-to-book transfer. `from` is the debit; `to` is the credit."
                     id: "14d2759d-c6b1-5e5f-85b2-af84bc650f57"
                     status: completed
                     origin: keette
-                    from: USD
-                    to: NGN
-                    amount_from: 10000
-                    amount_to: 1550000
-                    scale_from: 2
-                    scale_to: 2
+                    from:
+                      object: swap_from
+                      note: Source book — what leaves this balance.
+                      currency: USD
+                      scale: 2
+                      amount: 100
+                      amount_minor: 10000
+                      clear_amount: "100.00"
+                    to:
+                      object: swap_to
+                      note: Destination book — what is credited after conversion.
+                      currency: NGN
+                      scale: 2
+                      amount: 15500
+                      amount_minor: 1550000
+                      clear_amount: "15,500.00"
                     fx_rate: "155.00"
                     quote_id: "e6bd10ee-6e53-4aaa-9cd0-a2bb980cf73e"
                     stan: SWP-2610-ABCDEF12
@@ -906,13 +1378,30 @@ paths:
                 fee:
                   value:
                     object: payin_fee
-                    currency: NGN
-                    amount: 5000000
-                    partner_fee: 0
-                    margin: 5000
-                    fee: 5000
-                    credit_amount: 4995000
-                    scale: 2
+                    note: "Fee estimate for a top-up. `pay` is the funding side; `credit` is what lands in the book."
+                    product: payin_bank
+                    pay:
+                      object: payin_fee_pay
+                      note: Funding side — what the payer sends (before/around fees).
+                      currency: NGN
+                      scale: 2
+                      amount: 50000
+                      amount_minor: 5000000
+                      clear_amount: "50,000.00"
+                      fee: 50
+                      fee_minor: 5000
+                      partner_fee: 0
+                      partner_fee_minor: 0
+                      margin: 50
+                      margin_minor: 5000
+                    credit:
+                      object: payin_fee_credit
+                      note: What is expected to credit the target book after fees.
+                      currency: NGN
+                      scale: 2
+                      amount: 49950
+                      amount_minor: 4995000
+                      clear_amount: "49,950.00"
         "401":
           $ref: "#/components/responses/Unauthorized"
   /payins/preview:
@@ -922,7 +1411,8 @@ paths:
       summary: Payin Preview
       description: |
         Fee + indicative FX before `POST /payins/prepare`. Use the same `mode`
-        and currencies you will send to prepare.
+        and currencies you will send to prepare. Response nests `pay`, `fees`,
+        `credit`, and optional `fx`.
       requestBody:
         required: true
         content:
@@ -934,7 +1424,7 @@ paths:
                 value:
                   target_currency: NGN
                   mode: bank_details
-                  amount: 5000000
+                  amount: 50000
       responses:
         "200":
           description: Preview
@@ -942,6 +1432,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PayinPreview"
+              examples:
+                same_currency:
+                  value:
+                    object: payin_preview
+                    note: "Estimate before prepare. `pay` is the funding rail; `fees` are costs; `credit` is what your book receives."
+                    product: payin_bank
+                    pay:
+                      object: payin_preview_pay
+                      note: What the payer sends on the funding rail.
+                      currency: NGN
+                      scale: 2
+                      method: bank_transfer
+                      mode: bank_details
+                      amount: 50000
+                      amount_minor: 5000000
+                      clear_amount: "50,000.00"
+                    fees:
+                      object: payin_preview_fees
+                      note: Fees on the funding side (partner estimate + Keette margin).
+                      currency: NGN
+                      scale: 2
+                      fee: 50
+                      fee_minor: 5000
+                      partner_fee: 0
+                      partner_fee_minor: 0
+                      margin: 50
+                      margin_minor: 5000
+                    credit:
+                      object: payin_preview_credit
+                      note: What lands in your target book after fees / FX.
+                      currency: NGN
+                      scale: 2
+                      amount: 49950
+                      amount_minor: 4995000
+                      clear_amount: "49,950.00"
+                      gross: 50000
+                      gross_minor: 5000000
+                      clear_gross: "50,000.00"
         "401":
           $ref: "#/components/responses/Unauthorized"
   /payins/prepare:
@@ -1014,8 +1542,8 @@ paths:
       summary: Create Payin
       description: |
         Start a partner funding session (`bank_transfer`, momo, Interac,
-        Apple Pay, crypto checkout). Prefer `POST /payins/prepare` for static
-        bank / crypto address instructions. Requires `Idempotency-Key`.
+        crypto checkout). Prefer `POST /payins/prepare` for static bank /
+        crypto address instructions. Requires `Idempotency-Key`.
       parameters:
         - name: Idempotency-Key
           in: header
@@ -1101,6 +1629,35 @@ components:
               code: api_disabled
               message: Public API access is disabled for this workspace.
   schemas:
+    FxRate:
+      type: object
+      required: [from, to, rate, asOf, indicative]
+      properties:
+        from:
+          type: string
+          description: Source currency.
+          example: NGN
+        to:
+          type: string
+          description: Destination currency.
+          example: KES
+        rate:
+          type: string
+          description: Units of `to` bought by 1 unit of `from` (decimal string).
+          example: "0.096585"
+        asOf:
+          type: string
+          format: date-time
+          description: When the rate was observed.
+        indicative:
+          type: boolean
+          description: Always true for `GET /fx/rate` — not a firm lock.
+        disclaimer:
+          type: string
+          description: |
+            Present when the rate came from market failover rather than the
+            partner rail. Typically "Rates are indicative and not final."
+          example: Rates are indicative and not final.
     Me:
       type: object
       required: [object, tenant_id, environment, key]
@@ -1190,6 +1747,100 @@ components:
               type: string
               format: uri
               description: Optional link to docs for this error.
+    Bank:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [bank]
+        country:
+          type: string
+          description: ISO country of the directory entry.
+        currency:
+          type: string
+          description: Primary currency for transfers to this bank.
+        code:
+          type: string
+          description: "Value to send as `routing.bank_code` / `bankCode`."
+          example: "058"
+        name:
+          type: string
+          description: Display name.
+        type:
+          type: string
+          description: Optional bank type from the directory.
+    BankResolve:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [bank_resolve]
+        account_number:
+          type: string
+        account_name:
+          type: string
+          description: Registered name at the bank.
+        bank_code:
+          type: string
+        bank_name:
+          type: string
+    BankBic:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [bank_bic]
+        bic:
+          type: string
+        country:
+          type: string
+        found:
+          type: boolean
+        bank_name:
+          type: string
+        branch:
+          type: string
+        address:
+          type: object
+          additionalProperties:
+            type: string
+    BeneficiaryRelationship:
+      type: string
+      description: |
+        How the recipient relates to your workspace. Exact codes only —
+        see [Relationships & purposes](/guides/relationships-and-purposes)
+        or `GET /corridors` → `relationships`.
+      enum:
+        - vendor
+        - supplier
+        - contractor
+        - employee
+        - customer
+        - partner
+        - family
+        - self
+        - other
+      example: supplier
+    PayoutPurpose:
+      type: string
+      description: |
+        Why you are sending. Exact codes only —
+        see [Relationships & purposes](/guides/relationships-and-purposes)
+        or `GET /payouts/purposes`. Business workspaces cannot use
+        `family_support`. `other` requires a non-empty `note`.
+      enum:
+        - supplier_goods
+        - services
+        - professional_fees
+        - salaries
+        - rent
+        - tax
+        - loan_repayment
+        - intercompany
+        - investment
+        - family_support
+        - other
+      example: supplier_goods
     CreateBeneficiaryRequest:
       type: object
       required: [kind, currency, scheme, routing, email, address]
@@ -1221,10 +1872,7 @@ components:
           format: email
           description: Contact email for the recipient (required).
         relationship:
-          type: string
-          description: |
-            Relationship code from `GET /corridors` → `relationships` (e.g. supplier,
-            employee). Required for some personal corridors.
+          $ref: "#/components/schemas/BeneficiaryRelationship"
         address:
           $ref: "#/components/schemas/Address"
         currency:
@@ -1256,8 +1904,8 @@ components:
             aliases (`bank_code`, `account_number`) are accepted. Unknown keys are
             dropped.
           example:
-            bank_code: "058"
-            account_number: "0123456789"
+            bank_code: "044"
+            account_number: "0690000031"
     UpdateBeneficiaryRequest:
       type: object
       properties:
@@ -1269,8 +1917,7 @@ components:
           format: email
           description: Contact email.
         relationship:
-          type: string
-          description: Relationship code (see corridors catalog).
+          $ref: "#/components/schemas/BeneficiaryRelationship"
         address:
           $ref: "#/components/schemas/Address"
     Address:
@@ -1333,8 +1980,7 @@ components:
           type: string
           description: Contact email.
         relationship:
-          type: string
-          description: Relationship to your workspace.
+          $ref: "#/components/schemas/BeneficiaryRelationship"
         address:
           $ref: "#/components/schemas/Address"
         currency:
@@ -1391,34 +2037,75 @@ components:
           type: string
           enum: [live, sandbox]
           description: Environment of the creating API key.
+    Balance:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [balance]
+        id:
+          type: string
+          format: uuid
+          description: |
+            Balance / book id. Pass as `balance_id` on payout create and fee
+            so Keette knows which book money leaves.
+          example: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
+        currency:
+          type: string
+        available:
+          type: number
+          description: Spendable balance in major units (6 decimal places).
+          example: 20000.000000
+        available_minor:
+          type: integer
+          description: Ledger minor units for `available`.
+        clear_available:
+          type: string
+          description: Comma-separated display for `available`.
+          example: "20,000.00"
+        clear_balance:
+          type: string
+          description: Same as `clear_available` (readable book balance).
+          example: "20,000.00"
+        held:
+          type: number
+          description: Held balance in major units (6 decimal places).
+          example: 0.000000
+        held_minor:
+          type: integer
+        clear_held:
+          type: string
+          example: "0.00"
+        scale:
+          type: integer
+          description: Ledger decimal places for this currency (2 fiat, 6 stablecoins).
+        livemode:
+          type: boolean
+        environment:
+          type: string
+          enum: [live, sandbox]
+        details_available:
+          type: boolean
     CreatePayoutRequest:
       type: object
-      required: [beneficiary_id, currency, amount, purpose]
+      required: [beneficiary_id, balance_id, quote_id, purpose]
       properties:
         beneficiary_id:
           type: string
           format: uuid
-          description: "Id of a saved beneficiary to pay (`GET /beneficiaries`)."
+          description: |
+            Id of a saved beneficiary to pay (`GET /beneficiaries`) — where
+            money goes. Currency must equal the quote `to` currency.
           example: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
-        currency:
+        balance_id:
           type: string
+          format: uuid
           description: |
-            Source book currency to debit (ISO 4217 or stablecoin). May differ
-            from the beneficiary currency when `quote_id` is supplied.
-          example: NGN
-        amount:
-          type: integer
-          description: "Gross send amount in Ledger minor units (e.g. kobo, cents)."
-          example: 5000000
+            Source book from `GET /balances` (`data[].id`) — where money leaves.
+            Currency must equal the quote `from` currency.
+          example: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
         purpose:
-          type: string
-          description: |
-            Required purpose code from `GET /payouts/purposes`. Business workspaces
-            cannot use `family_support` (personal only). Common codes:
-            `supplier_goods`, `services`, `professional_fees`, `salaries`,
-            `rent`, `tax`, `loan_repayment`, `intercompany`, `investment`,
-            `other` (requires `note`).
-          example: supplier_goods
+          $ref: "#/components/schemas/PayoutPurpose"
         note:
           type: string
           description: "Free-text note. Required when `purpose` is `other`."
@@ -1431,75 +2118,112 @@ components:
           type: string
           format: uuid
           description: |
-            Firm FX quote id from `POST /fx/quotes` (omit `purpose`, or leave empty).
-            Required when the beneficiary currency differs from `currency`.
+            Firm quote id from `POST /fx/quotes` (omit `purpose`, or leave empty
+            for a payout quote). **Required.** Gross send and recipient amounts
+            are taken from the quote — do not send `amount`. Same-currency:
+            quote with `from` == `to`. Cross-currency: quote `to` must match
+            the beneficiary currency.
           example: "e6bd10ee-6e53-4aaa-9cd0-a2bb980cf73e"
     PayoutFeeRequest:
       type: object
-      required: [beneficiary_id, currency, amount]
+      required: [beneficiary_id, balance_id]
       properties:
         beneficiary_id:
           type: string
           format: uuid
-          description: Beneficiary the fee estimate applies to.
+          description: Beneficiary the fee estimate applies to (where money goes).
           example: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
-        currency:
+        balance_id:
           type: string
-          description: Source book currency for the planned send.
-          example: NGN
+          format: uuid
+          description: |
+            Source book from `GET /balances` (`data[].id`) — where money leaves.
+          example: "3f1c0b2a-8d4e-4a91-9c2f-1a2b3c4d5e6f"
         amount:
+          type: number
+          format: double
+          description: |
+            Planned send in **major units** of the source balance (optional when
+            `quote_id` or `recipient_amount` is set). See [Money amounts](/guides/money).
+          example: 50000
+        amount_minor:
           type: integer
-          description: Planned send amount in Ledger minor units.
+          description: Exact Ledger minor units (optional alternative to `amount`).
           example: 5000000
         quote_id:
           type: string
           format: uuid
-          description: Optional firm quote id for cross-currency fee accuracy.
-        recipient_amount:
-          type: integer
           description: |
-            Optional estimated recipient amount in their currency minor units when
-            you do not yet have a firm `quote_id`.
+            Firm FX quote from `POST /fx/quotes`. When set and not expired, its
+            locked amounts are used (and override a matching `amount` /
+            `recipient_amount`).
+        recipient_amount:
+          type: number
+          format: double
+          description: |
+            Amount the **beneficiary** should receive, in their currency major
+            units (from `beneficiary_id`). When `amount` is omitted, Keette
+            estimates how much to debit from `balance_id`.
+          example: 50000
+        recipient_amount_minor:
+          type: integer
+          description: Exact Ledger minors for `recipient_amount` (beneficiary currency).
     PayoutFee:
       type: object
+      description: |
+        Nested fee estimate. Read `note` on each object. Money fields inside
+        `source` / `recipient` follow [Money amounts](/guides/money).
       properties:
         object:
           type: string
           enum: [payout_fee]
-          description: Object type discriminator.
-        currency:
+        note:
           type: string
-          description: "Currency of `amount`, `transfer_fee`, and `total`."
-        amount:
-          type: integer
-          description: Requested send amount in Ledger minor units.
-        transfer_fee:
-          type: integer
-          description: Estimated customer-visible transfer fee in minor units.
-        total:
-          type: integer
-          description: |
-            Gross send / book debit amount in minor units (same as `amount`).
-            `transfer_fee` is carved from this total; it is not amount + fee.
+          description: Top-level developer hint.
         exact:
           type: boolean
           description: |
-            `true` when the fee is final for this input; `false` when indicative
-            (e.g. before a firm FX quote).
-        min_payment:
-          type: integer
-          description: "Minimum allowed send for this corridor, if applicable."
-        scale:
-          type: integer
-          description: Decimal places for the currency (usually 2).
+            `true` when same-currency or firm `quote_id`; `false` when indicative FX.
+        exact_note:
+          type: string
+        source:
+          type: object
+          description: Debit side — book that will be charged.
+          properties:
+            object: { type: string, enum: [payout_fee_source] }
+            note: { type: string }
+            balance_id: { type: string, format: uuid }
+            currency: { type: string }
+            scale: { type: integer }
+            available: { type: number, format: double }
+            available_minor: { type: integer }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
+            transfer_fee: { type: number, format: double }
+            total: { type: number, format: double }
+            min_payment: { type: number, format: double }
+        recipient:
+          type: object
+          description: Credit side — what the beneficiary receives.
+          properties:
+            object: { type: string, enum: [payout_fee_recipient] }
+            note: { type: string }
+            beneficiary_id: { type: string, format: uuid }
+            currency: { type: string }
+            scale: { type: integer }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
     Swap:
       type: object
-      required: [object, id, status, from, to, amount_from, amount_to, stan]
+      required: [object, id, status, from, to, stan]
       properties:
         object:
           type: string
           enum: [swap]
           description: Object type discriminator.
+        note:
+          type: string
+          description: Developer hint — `from` is the debit; `to` is the credit.
         id:
           type: string
           format: uuid
@@ -1512,23 +2236,27 @@ components:
           type: string
           description: "How the swap was initiated (`keette` for API/dashboard)."
         from:
-          type: string
-          description: Debited book currency.
+          type: object
+          description: Source book (debit).
+          properties:
+            object: { type: string, enum: [swap_from] }
+            note: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
+            clear_amount: { type: string }
         to:
-          type: string
-          description: Credited book currency.
-        amount_from:
-          type: integer
-          description: Debit amount in Ledger minor units.
-        amount_to:
-          type: integer
-          description: Credit amount in Ledger minor units.
-        scale_from:
-          type: integer
-          description: "Decimal places for `from`."
-        scale_to:
-          type: integer
-          description: "Decimal places for `to`."
+          type: object
+          description: Destination book (credit).
+          properties:
+            object: { type: string, enum: [swap_to] }
+            note: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
+            clear_amount: { type: string }
         fx_rate:
           type: string
           description: Applied rate as a decimal string.
@@ -1536,6 +2264,9 @@ components:
           type: string
           format: uuid
           description: Firm quote that locked the rate.
+        quote:
+          type: object
+          description: Nested firm quote (same amounts as `from` / `to`).
         reason:
           type: string
           description: Failure or reversal reason when applicable.
@@ -1585,14 +2316,24 @@ components:
           type: string
           description: Source book currency that was (or will be) debited.
         amount:
+          type: number
+          format: double
+          description: Gross send in major units (6 decimal places).
+        amount_minor:
           type: integer
           description: Gross send in Ledger minor units.
         fee:
-          type: integer
+          type: number
+          format: double
           description: Customer-visible transfer fee (partner + margin + cross-border).
-        transfer_fee:
+        fee_minor:
           type: integer
-          description: "Transfer fee component in minor units (same as `fee` for most corridors)."
+        transfer_fee:
+          type: number
+          format: double
+          description: "Transfer fee component (same as `fee` for most corridors)."
+        transfer_fee_minor:
+          type: integer
         scheme:
           type: string
           description: Corridor scheme used for the send.
@@ -1607,8 +2348,7 @@ components:
           format: uuid
           description: Recipient beneficiary id.
         purpose:
-          type: string
-          description: Purpose code submitted with the payout.
+          $ref: "#/components/schemas/PayoutPurpose"
         purpose_label:
           type: string
           description: Human-readable purpose label.
@@ -1629,8 +2369,11 @@ components:
           type: string
           description: Currency credited to the beneficiary.
         recipient_amount:
+          type: number
+          format: double
+          description: Amount the beneficiary receives (major units).
+        recipient_amount_minor:
           type: integer
-          description: "Amount the beneficiary receives, in their minor units."
         recipient_scale:
           type: integer
           description: "Decimal places for `recipient_currency`."
@@ -1664,8 +2407,8 @@ components:
           type: string
           description: |
             Funding method. Accepted values: `bank_transfer`, `momo`, `interac`,
-            `crypto`, `apple_pay`. `bank_details` / `bank` are aliases for
-            `bank_transfer`. Provide `method` or `mode`.
+            `crypto`. `bank_details` / `bank` are aliases for `bank_transfer`.
+            Provide `method` or `mode`.
           example: bank_transfer
         mode:
           type: string
@@ -1679,9 +2422,16 @@ components:
           description: Book currency that will be credited.
           example: NGN
         amount:
+          type: number
+          format: double
+          description: |
+            Funding amount in **major units** of `currency` (or target when
+            omitted). See [Money amounts](/guides/money). Optional `amount_minor`
+            for exact Ledger integers.
+          example: 50000
+        amount_minor:
           type: integer
-          description: Funding amount in Ledger minor units of `currency` (or target when omitted).
-          example: 5000000
+          description: Exact Ledger minor units (optional alternative to `amount`).
         currency:
           type: string
           description: Currency of `amount` for the fee quote; defaults to `target_currency`.
@@ -1692,33 +2442,41 @@ components:
           type: string
           enum: [payin_fee]
           description: Object type discriminator.
-        currency:
+        note:
           type: string
-          description: Currency of the quoted amounts.
-        amount:
-          type: integer
-          description: Requested funding amount in minor units.
-        partner_fee:
-          type: integer
-          description: Partner rail cost in minor units.
-        margin:
-          type: integer
-          description: Keette concession / margin in minor units.
-        fee:
-          type: integer
-          description: Total fee charged to the payer (`partner_fee` + `margin`).
-        credit_amount:
-          type: integer
-          description: Net amount expected to credit the book after fees.
-        margin_source:
-          type: string
-          description: Pricing source for the margin line.
+          description: Developer hint for `pay` vs `credit`.
         product:
           type: string
           description: Internal pricing product key.
-        scale:
-          type: integer
-          description: Decimal places for the currency.
+        margin_source:
+          type: string
+          description: Pricing source for the margin line.
+        pay:
+          type: object
+          description: Funding side — what the payer sends and the fee lines.
+          properties:
+            object: { type: string, enum: [payin_fee_pay] }
+            note: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
+            fee: { type: number, format: double }
+            fee_minor: { type: integer }
+            partner_fee: { type: number, format: double }
+            partner_fee_minor: { type: integer }
+            margin: { type: number, format: double }
+            margin_minor: { type: integer }
+        credit:
+          type: object
+          description: Expected book credit after fees.
+          properties:
+            object: { type: string, enum: [payin_fee_credit] }
+            note: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
     PayinPreviewRequest:
       type: object
       required: [target_currency, mode, amount]
@@ -1736,9 +2494,15 @@ components:
           description: Collection mode (same values as prepare).
           example: bank_details
         amount:
+          type: number
+          format: double
+          description: |
+            What the payer sends in `source_currency` **major units**. See
+            [Money amounts](/guides/money).
+          example: 50000
+        amount_minor:
           type: integer
-          description: What the payer sends in `source_currency` minor units.
-          example: 5000000
+          description: Exact Ledger minor units (optional alternative to `amount`).
         channel:
           type: string
           description: Momo channel id when `mode` is `momo` (e.g. `KE-MPESA`).
@@ -1752,64 +2516,64 @@ components:
           type: string
           enum: [payin_preview]
           description: Object type discriminator.
-        target_currency:
+        note:
           type: string
-          description: Book currency that will be credited.
-        source_currency:
-          type: string
-          description: Currency the payer funds in.
-        mode:
-          type: string
-          description: Collection mode used for the estimate.
-        method:
-          type: string
-          description: Start-compatible method string for `POST /payins`.
-        pay_amount:
-          type: integer
-          description: Amount the payer should send (source minor units).
-        fee:
-          type: integer
-          description: Total fee in `fee_currency` minor units.
-        fee_currency:
-          type: string
-          description: Currency of the fee line.
-        partner_fee:
-          type: integer
-          description: Partner portion of the fee.
-        margin:
-          type: integer
-          description: Keette margin portion of the fee.
-        credit_amount:
-          type: integer
-          description: Expected net credit to the target book.
-        target_gross:
-          type: integer
-          description: Target-side amount before fee (after FX when cross-currency).
-        rate:
-          type: string
-          description: Indicative FX rate when currencies differ.
-        rate_as_of:
-          type: string
-          format: date-time
-          description: When the indicative rate was observed.
-        indicative:
-          type: boolean
-          description: "`true` when FX is not a firm locked quote."
+          description: Developer hint — `pay` / `fees` / `credit` / optional `fx`.
         product:
           type: string
           description: Pricing product key.
-        channel:
-          type: string
-          description: Echo of momo channel when set.
-        network:
-          type: string
-          description: Echo of crypto network when set.
-        scale_source:
-          type: integer
-          description: Decimal places for `source_currency`.
-        scale_target:
-          type: integer
-          description: Decimal places for `target_currency`.
+        pay:
+          type: object
+          description: Funding rail — what the payer sends.
+          properties:
+            object: { type: string, enum: [payin_preview_pay] }
+            note: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            method: { type: string }
+            mode: { type: string }
+            channel: { type: string }
+            network: { type: string }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
+            clear_amount: { type: string }
+        fees:
+          type: object
+          description: Fee lines on the funding side.
+          properties:
+            object: { type: string, enum: [payin_preview_fees] }
+            note: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            fee: { type: number, format: double }
+            fee_minor: { type: integer }
+            partner_fee: { type: number, format: double }
+            partner_fee_minor: { type: integer }
+            margin: { type: number, format: double }
+            margin_minor: { type: integer }
+        credit:
+          type: object
+          description: What lands in the target book.
+          properties:
+            object: { type: string, enum: [payin_preview_credit] }
+            note: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
+            clear_amount: { type: string }
+            gross: { type: number, format: double }
+            gross_minor: { type: integer }
+            clear_gross: { type: string }
+        fx:
+          type: object
+          description: Present when source and target currencies differ.
+          properties:
+            object: { type: string, enum: [payin_preview_fx] }
+            note: { type: string }
+            rate: { type: string }
+            as_of: { type: string, format: date-time }
+            indicative: { type: boolean }
     PreparePayinRequest:
       type: object
       required: [target_currency, mode, amount]
@@ -1829,12 +2593,24 @@ components:
           description: How funds will arrive.
           example: bank_details
         amount:
+          type: number
+          format: double
+          description: |
+            Amount the payer sends in `source_currency` **major units**. See
+            [Money amounts](/guides/money).
+          example: 50000
+        amount_minor:
           type: integer
-          description: Amount the payer sends in `source_currency` minor units.
-          example: 5000000
+          description: Exact Ledger minor units (optional alternative to `amount`).
         target_amount:
+          type: number
+          format: double
+          description: |
+            Required when `source_currency` differs from `target_currency` —
+            expected credit in target **major units**.
+        target_amount_minor:
           type: integer
-          description: Required when `source_currency` differs from `target_currency` — expected credit in target minor units.
+          description: Exact Ledger minors for `target_amount`.
         network:
           type: string
           description: Crypto network (`base`, `ethereum`, …). Defaults to `base` for crypto.
@@ -1867,22 +2643,32 @@ components:
       properties:
         method:
           type: string
-          description: "Funding method (`bank_transfer`, `momo`, `interac`, `crypto`, `apple_pay`, …)."
+          description: "Funding method (`bank_transfer`, `momo`, `interac`, `crypto`)."
           example: bank_transfer
         target_currency:
           type: string
           description: Book currency to credit.
           example: GBP
         amount:
+          type: number
+          format: double
+          description: |
+            Amount in **major units** (target currency, unless rail fields set).
+            See [Money amounts](/guides/money).
+          example: 100
+        amount_minor:
           type: integer
-          description: Amount in Ledger minor units (target, unless rail fields set).
-          example: 10000
+          description: Exact Ledger minor units (optional alternative to `amount`).
         rail_currency:
           type: string
           description: Optional rail currency when the payer pays in a different currency.
         rail_amount:
+          type: number
+          format: double
+          description: Amount in `rail_currency` **major units** when set.
+        rail_amount_minor:
           type: integer
-          description: Amount in `rail_currency` minor units when set.
+          description: Exact Ledger minors for `rail_amount`.
         redirect_url:
           type: string
           format: uri
@@ -1952,6 +2738,9 @@ components:
           type: string
           enum: [payin]
           description: Object type discriminator.
+        note:
+          type: string
+          description: Developer hint — `payer` / `credit` / `collection`.
         id:
           type: string
           format: uuid
@@ -1959,53 +2748,51 @@ components:
         stan:
           type: string
           description: System trace / reference.
-        method:
-          type: string
-          description: Funding method.
-        target_currency:
-          type: string
-          description: Book currency to credit.
-        rail_currency:
-          type: string
-          description: Currency on the payment rail when different.
-        amount:
-          type: integer
-          description: Requested amount in target (or primary) minor units.
-        rail_amount:
-          type: integer
-          description: Amount on the rail in rail minor units.
-        target_amount:
-          type: integer
-          description: Expected credit to the target book in minor units.
-        scale:
-          type: integer
-          description: Decimal places for `target_currency`.
         status:
           type: string
           description: "Lifecycle status (`pending`, `processing`, `completed`, `failed`, …)."
-        checkout_url:
-          type: string
-          format: uri
-          description: Hosted checkout URL when the method requires a redirect.
-        redirect_url:
-          type: string
-          format: uri
-          description: Return URL you supplied.
-        source_kind:
-          type: string
-          description: Origin kind from prepare.
-        collection_mode:
-          type: string
-          description: Prepare mode (`bank_details`, `crypto_address`, …).
-        network:
-          type: string
-          description: Crypto network when applicable.
-        instructions:
+        payer:
           type: object
-          additionalProperties: true
-          description: |
-            Receive instructions for the payer (account number, bank name,
-            wallet address, etc.). Shape depends on `collection_mode`.
+          description: What the payer sends on the rail.
+          properties:
+            object: { type: string, enum: [payin_payer] }
+            note: { type: string }
+            method: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
+            clear_amount: { type: string }
+        credit:
+          type: object
+          description: What credits your book.
+          properties:
+            object: { type: string, enum: [payin_credit] }
+            note: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            amount: { type: number, format: double }
+            amount_minor: { type: integer }
+            clear_amount: { type: string }
+            requested: { type: number, format: double }
+            requested_minor: { type: integer }
+        collection:
+          type: object
+          description: How to collect — checkout URL and/or receive instructions.
+          properties:
+            object: { type: string, enum: [payin_collection] }
+            note: { type: string }
+            mode: { type: string }
+            source_kind: { type: string }
+            network: { type: string }
+            checkout_url: { type: string, format: uri }
+            redirect_url: { type: string, format: uri }
+            instructions:
+              type: object
+              additionalProperties: true
+              description: |
+                Receive instructions for the payer (account number, bank name,
+                wallet address, etc.). Shape depends on `mode`.
         failure_reason:
           type: string
           description: Failure message when status is failed.

@@ -12,6 +12,14 @@ All public requests use the same host and path prefix:
 https://api.keette.com/v1
 ```
 
+For local API playground testing, the docs default to the current ngrok tunnel:
+
+```text
+https://1178-41-90-137-132.ngrok-free.app/v1
+```
+
+(That forwards to core on `:8080`. Switch the OpenAPI server back to production when the tunnel is down.)
+
 There is no separate sandbox hostname for v1. The **API key** selects the environment:
 
 | Key prefix   | Environment | Money and rails        |
@@ -22,6 +30,18 @@ There is no separate sandbox hostname for v1. The **API key** selects the enviro
 Business workspaces have a **live** home tenant and a linked **sandbox twin**. After KYB approval you land in **Live**; Dev mode in the dashboard switches onto the twin. `sk_test_…` keys and sandbox webhooks belong to that twin.
 
 In Dev mode, partner rails are never called. Use **Bank Simulator** (General) to credit sandbox balances — emails, notifications, and webhooks still fire.
+
+### Nigeria sandbox demo account
+
+For sandbox NIP (`ng_nip`) create + payout tests, use Access Bank:
+
+| Field | Value |
+| ----- | ----- |
+| Bank code | `044` |
+| Account number | `0690000031` |
+| Account name | Keette Sandbox Test |
+
+Other NUBANs can be saved as beneficiaries in sandbox, but partner payout settlement remaps to this test account.
 
 ## Isolation
 

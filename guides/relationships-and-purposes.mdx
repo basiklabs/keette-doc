@@ -1,0 +1,74 @@
+---
+title: "Relationships & purposes"
+description: "Allowed beneficiary relationship codes and payout purpose codes."
+icon: "list"
+---
+
+Use these **exact codes** on create/update. Free-text labels are rejected (`parameter_invalid`).
+
+You can also fetch them live:
+
+- Relationships — `GET /v1/corridors` → `relationships`
+- Purposes — `GET /v1/payouts/purposes` → `purposes[].code` (filtered by workspace kind)
+
+## Beneficiary relationships
+
+Pass as `relationship` on `POST /v1/beneficiaries` or `PATCH /v1/beneficiaries/{id}`.
+
+| Code | Meaning |
+| ---- | ------- |
+| `vendor` | Vendor |
+| `supplier` | Supplier |
+| `contractor` | Contractor |
+| `employee` | Employee |
+| `customer` | Customer |
+| `partner` | Partner |
+| `family` | Family |
+| `self` | Self |
+| `other` | Other |
+
+```bash
+curl https://api.keette.com/v1/beneficiaries \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{ …, "relationship": "supplier" }'
+```
+
+## Payout purposes
+
+Pass as `purpose` on `POST /v1/payouts` (required).
+
+| Code | Label | Notes |
+| ---- | ----- | ----- |
+| `supplier_goods` | Supplier payment for goods | |
+| `services` | Payment for services | |
+| `professional_fees` | Professional fees | |
+| `salaries` | Salaries and payroll | |
+| `rent` | Rent | |
+| `tax` | Tax payment | |
+| `loan_repayment` | Loan repayment | |
+| `intercompany` | Intercompany transfer | |
+| `investment` | Investment | |
+| `family_support` | Family support | Personal workspaces only — not allowed for business |
+| `other` | Other | Requires a non-empty `note` |
+
+```bash
+curl https://api.keette.com/v1/payouts \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: pay-2026-04-01-ada" \
+  -d '{
+    "beneficiary_id": "…",
+    "amount": 50000,
+    "currency": "NGN",
+    "purpose": "salaries"
+  }'
+```
+
+Business workspaces: omit `family_support`. Prefer `GET /v1/payouts/purposes` so document threshold rules for your currency are included.
+
+## Next
+
+- [Beneficiaries](/guides/beneficiaries)
+- [Payouts](/guides/payouts)
+- [API reference — Purposes](/api-reference/payouts/purposes)

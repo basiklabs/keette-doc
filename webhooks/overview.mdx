@@ -42,13 +42,12 @@ Every delivery uses the same outer shape. Metadata comes first; **`data` is alwa
 
 ## Money in `data`
 
-Webhook money fields are **JSON numbers** in major units, always written with **6 decimal places**:
+Webhook money fields match the [public API money rules](/guides/money):
 
-- `amount`, `fee`, `transfer_fee`, `total_debit` → `200.000000`, `0.310000`, …
-- Each has a companion integer: `amount_minor`, `fee_minor`, `transfer_fee_minor`, `total_debit_minor` (Ledger minor units)
+- **JSON numbers** in major units with **6 decimal places**: `200.000000`, `0.310000`, …
+- **`clear_*` strings** for comma-separated display: `clear_amount`, `clear_fee`, …
+- **`*_minor` integers** for exact Ledger math
 - `scale` is always present (usually `2`; stablecoins use `6`)
-
-Use the float fields when displaying or reconciling against the product UI. Use `*_minor` when you need exact integer math.
 
 ## What else is in `data`
 
