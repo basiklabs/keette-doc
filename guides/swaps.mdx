@@ -9,16 +9,16 @@ A **swap** moves value between two books you own (for example USD → NGN) using
 ## Sequence
 
 1. `POST /v1/fx/quotes` with `"purpose": "swap"`, `from`, `to`, and one amount
-2. `POST /v1/swaps` with that `quote_id` (and an idempotency key)
+2. `POST /v1/swaps` with that `quote_id` and an `Idempotency-Key` header
 3. Poll `GET /v1/swaps/{id}` or listen for swap webhooks
 
 ```bash
 curl https://api.keette.com/v1/swaps \
   -H "Authorization: Bearer sk_test_…" \
   -H "Content-Type: application/json" \
+  -H "Idempotency-Key: swap-usd-ngn-001" \
   -d '{
-    "quote_id": "…",
-    "idempotency_key": "swap-usd-ngn-001"
+    "quote_id": "…"
   }'
 ```
 

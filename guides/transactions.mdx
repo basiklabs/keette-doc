@@ -4,20 +4,31 @@ description: "Unified history across payouts, payins, swaps, and more."
 icon: "receipt"
 ---
 
-The **transactions** index is a single timeline for money movements in the key’s environment — payouts, inflows, swaps, and related kinds.
+The **transactions** index is a single timeline for money movements in the key’s environment — sends, receives, swaps, and pot saves.
 
 ## List
 
 ```bash
-curl "https://api.keette.com/v1/transactions?limit=25&page=1" \
+curl "https://api.keette.com/v1/transactions?limit=25&page=1&kind=send" \
   -H "Authorization: Bearer sk_test_…"
 ```
 
-Optional filters: `kind`, `status`, `currency`.
+Optional filters:
+
+| Param | Values |
+| ----- | ------ |
+| `kind` | `send`, `receive`, `swap`, `save` (comma-separated allowed) |
+| `status` | `processing`, `completed`, `failed`, `reversed` |
+| `currency` | ISO / stablecoin code |
+| `type` | Response-side filter: `inflow`, `outflow`, `swap` |
+| `from` / `to` | Time bounds |
+| `q` | Free-text search |
+
+List rows expose `type` as `inflow` / `outflow` / `swap` (not the same vocabulary as the `kind` filter).
 
 ## Detail
 
-`GET /v1/transactions/{id}` returns the row plus a timeline / source detail when available. Prefer this (or webhooks) over scraping multiple resource endpoints when building an activity feed.
+`GET /v1/transactions/{id}` returns the row plus a timeline and nested source detail (`payout`, `inflow`, or `swap`) when available. Prefer this (or webhooks) over scraping multiple resource endpoints when building an activity feed.
 
 ## Next
 

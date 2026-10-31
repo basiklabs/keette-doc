@@ -17,10 +17,13 @@ Each corridor typically includes:
 
 | Field | Meaning |
 | ----- | ------- |
-| `scheme` | Stable id you send on beneficiaries / payouts |
-| `currency` | Book / destination currency |
+| `scheme` | Stable id you send on beneficiaries / payouts (e.g. `ng_nip`, not `ngn_bank`) |
+| `currencies` | Supported payout currencies |
 | `method` | High-level rail (bank, momo, wire, …) |
-| Required destination fields | Account number, bank code, IBAN, … |
+| `fields` | Required routing keys (`key` is camelCase, e.g. `bankCode`) |
+| `minMinor` / `maxMinor` | Amount bounds when set |
+
+The list response also includes top-level `relationships` codes you may send on beneficiaries.
 
 ## Using corridors
 

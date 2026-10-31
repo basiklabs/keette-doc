@@ -60,7 +60,7 @@ paths:
                     key:
                       id: "key_01EXAMPLE"
                       prefix: "sk_test_19d0"
-                      expires_at: "2026-12-31T00:00:00Z"
+                      name: Sample Keys
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -181,12 +181,16 @@ paths:
           schema: { type: integer, default: 1 }
         - name: kind
           in: query
-          description: "Filter by kind (`payout`, `inflow`, `swap`, …)."
-          schema: { type: string }
+          description: "Filter by kind: `send`, `receive`, `swap`, or `save` (comma-separated allowed)."
+          schema:
+            type: string
+            enum: [send, receive, swap, save]
         - name: status
           in: query
-          description: "Filter by status (`completed`, `failed`, `processing`, …)."
-          schema: { type: string }
+          description: "Filter by status: `processing`, `completed`, `failed`, or `reversed` (comma-separated allowed)."
+          schema:
+            type: string
+            enum: [processing, completed, failed, reversed]
         - name: currency
           in: query
           description: Filter by book currency (ISO 4217 / stablecoin).
@@ -202,9 +206,9 @@ paths:
       tags: [Transactions]
       summary: Transaction
       description: |
-        Full transaction: timeline, source (`payout` / `inflow` / `swap`),
-        expanded `counterparty` (beneficiary or sender fields), and `quote`
-        (id, rate, currencies, amounts) when FX was locked.
+        Full transaction: timeline, source detail for the underlying send /
+        receive / swap / save, expanded `counterparty` (beneficiary or sender
+        fields), and `quote` (id, rate, currencies, amounts) when FX was locked.
       parameters:
         - name: id
           in: path
@@ -222,6 +226,27 @@ paths:
       operationId: listBeneficiaries
       tags: [Beneficiaries]
       summary: Beneficiaries
+      parameters:
+        - name: page
+          in: query
+          description: 1-based page index.
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          description: Page size.
+          schema: { type: integer, default: 20 }
+        - name: status
+          in: query
+          description: "`active` (default), `archived`, or `all`."
+          schema: { type: string }
+        - name: currency
+          in: query
+          description: Filter by payout currency.
+          schema: { type: string }
+        - name: q
+          in: query
+          description: Free-text search on name / nickname / route label.
+          schema: { type: string }
       responses:
         "200":
           description: Beneficiary list
@@ -233,7 +258,8 @@ paths:
       summary: Create Beneficiary
       description: |
         Save a payout recipient. Scheme and routing keys must match a corridor
-        from `GET /corridors`. Emits `event.beneficiary.created`.
+        from `GET /corridors`. Email and a street/city/country address are
+        required. Emits `event.beneficiary.created`.
       requestBody:
         required: true
         content:
@@ -241,16 +267,21 @@ paths:
             schema:
               $ref: "#/components/schemas/CreateBeneficiaryRequest"
             examples:
-              ngn_bank:
-                summary: Nigerian bank account (person)
+              ng_nip:
+                summary: Nigerian bank account (individual)
                 value:
-                  kind: person
+                  kind: individual
                   first_name: Ada
                   last_name: Okoye
+                  email: ada@example.com
                   currency: NGN
                   country: NG
                   scheme: ng_nip
                   holder_name: Ada Okoye
+                  address:
+                    line_1: 12 Admiralty Way
+                    city: Lagos
+                    country: NG
                   routing:
                     bank_code: "058"
                     account_number: "0123456789"
@@ -535,7 +566,7 @@ paths:
                     amount: 5000000
                     fee: 15000
                     transfer_fee: 10000
-                    scheme: ngn_bank
+                    scheme: ng_nip
                     country: NG
                     stan: OUT-2610-ABCDEF12
                     beneficiary_id: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
@@ -615,8 +646,19 @@ paths:
                         label: Salaries and payroll
                       - code: rent
                         label: Rent
+                      - code: tax
+                        label: Tax payment
+                      - code: loan_repayment
+                        label: Loan repayment
+                      - code: intercompany
+                        label: Intercompany transfer
+                      - code: investment
+                        label: Investment
                       - code: other
                         label: Other
+                    documentRules:
+                      - currency: NGN
+                        thresholdMinor: 500000000
         "401":
           $ref: "#/components/responses/Unauthorized"
   /payouts/{id}:
@@ -647,7 +689,7 @@ paths:
                     amount: 5000000
                     fee: 15000
                     transfer_fee: 10000
-                    scheme: ngn_bank
+                    scheme: ng_nip
                     country: NG
                     stan: OUT-2610-ABCDEF12
                     beneficiary_id: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
@@ -691,7 +733,7 @@ paths:
                     amount: 5000000
                     fee: 0
                     transfer_fee: 0
-                    scheme: ngn_bank
+                    scheme: ng_nip
                     country: NG
                     stan: OUT-2610-ABCDEF12
                     beneficiary_id: "bbd938a2-dbbe-43bf-bfb9-1c5dbe444523"
@@ -1077,7 +1119,7 @@ components:
         key:
           type: object
           description: Non-secret metadata for the authenticating key.
-          required: [id, prefix, expires_at]
+          required: [id, prefix, name]
           properties:
             id:
               type: string
@@ -1085,10 +1127,9 @@ components:
             prefix:
               type: string
               description: Non-secret key prefix shown in the dashboard.
-            expires_at:
+            name:
               type: string
-              format: date-time
-              description: When this key stops working (UTC).
+              description: Display name of the key from the dashboard.
     Event:
       type: object
       required: [id, object, type, created, livemode, data]
@@ -1151,20 +1192,23 @@ components:
               description: Optional link to docs for this error.
     CreateBeneficiaryRequest:
       type: object
-      required: [kind, currency, scheme, holder_name, routing]
+      required: [kind, currency, scheme, routing, email, address]
       properties:
         kind:
           type: string
-          enum: [person, business]
-          description: "Recipient type. Use `person` with first/last name, or `business` with `business_name`."
-          example: person
+          enum: [individual, business, person]
+          description: |
+            Recipient type. Use `individual` with `first_name` / `last_name`, or
+            `business` with `business_name`. `person` is accepted as an alias of
+            `individual` and stored as `individual`.
+          example: individual
         first_name:
           type: string
-          description: "Given name (required when `kind` is `person`)."
+          description: "Given name (required when `kind` is `individual` or `person`)."
           example: Ada
         last_name:
           type: string
-          description: "Family name (required when `kind` is `person`)."
+          description: "Family name (required when `kind` is `individual` or `person`)."
           example: Okoye
         business_name:
           type: string
@@ -1175,7 +1219,7 @@ components:
         email:
           type: string
           format: email
-          description: Optional contact email for the recipient.
+          description: Contact email for the recipient (required).
         relationship:
           type: string
           description: |
@@ -1199,15 +1243,18 @@ components:
           example: ng_nip
         holder_name:
           type: string
-          description: Account holder name as registered with the receiving bank or wallet.
+          description: |
+            Account holder name as registered with the receiving bank or wallet.
+            Optional; defaults to the individual or business display name.
           example: Ada Okoye
         routing:
           type: object
           additionalProperties: true
           description: |
-            Scheme-specific account identifiers. Keys depend on the corridor
-            (e.g. `bank_code` + `account_number` for `ng_nip`). See corridor
-            field definitions from `GET /corridors`.
+            Scheme-specific account identifiers. Keys match corridor field `key`
+            values from `GET /corridors` (camelCase, e.g. `bankCode`). Snake_case
+            aliases (`bank_code`, `account_number`) are accepted. Unknown keys are
+            dropped.
           example:
             bank_code: "058"
             account_number: "0123456789"
@@ -1228,7 +1275,11 @@ components:
           $ref: "#/components/schemas/Address"
     Address:
       type: object
-      description: Postal address for the recipient when the corridor requires it.
+      description: |
+        Postal address for the recipient. On create, `line_1`, `city`, and
+        `country` are required. CamelCase aliases (`line1`, `postalCode`) are
+        accepted on input.
+      required: [line_1, city, country]
       properties:
         line_1:
           type: string
@@ -1261,17 +1312,17 @@ components:
           description: "Beneficiary id — pass as `beneficiary_id` on payouts."
         kind:
           type: string
-          enum: [person, business]
-          description: Recipient type.
+          enum: [individual, business]
+          description: "Recipient type as stored (`person` on create is normalized to `individual`)."
         name:
           type: string
-          description: Display name derived from person or business fields.
+          description: Display name derived from individual or business fields.
         first_name:
           type: string
-          description: "Given name when `kind` is `person`."
+          description: "Given name when `kind` is `individual`."
         last_name:
           type: string
-          description: "Family name when `kind` is `person`."
+          description: "Family name when `kind` is `individual`."
         business_name:
           type: string
           description: "Legal name when `kind` is `business`."
@@ -1342,7 +1393,7 @@ components:
           description: Environment of the creating API key.
     CreatePayoutRequest:
       type: object
-      required: [beneficiary_id, currency, amount]
+      required: [beneficiary_id, currency, amount, purpose]
       properties:
         beneficiary_id:
           type: string
@@ -1362,10 +1413,11 @@ components:
         purpose:
           type: string
           description: |
-            Purpose code from `GET /payouts/purposes`. Business workspaces cannot
-            use `family_support` (personal only). Common business codes:
+            Required purpose code from `GET /payouts/purposes`. Business workspaces
+            cannot use `family_support` (personal only). Common codes:
             `supplier_goods`, `services`, `professional_fees`, `salaries`,
-            `rent`, `other` (requires `note`).
+            `rent`, `tax`, `loan_repayment`, `intercompany`, `investment`,
+            `other` (requires `note`).
           example: supplier_goods
         note:
           type: string
@@ -1426,7 +1478,9 @@ components:
           description: Estimated customer-visible transfer fee in minor units.
         total:
           type: integer
-          description: "Amount plus fee (what leaves the book), in minor units."
+          description: |
+            Gross send / book debit amount in minor units (same as `amount`).
+            `transfer_fee` is carved from this total; it is not amount + fee.
         exact:
           type: boolean
           description: |

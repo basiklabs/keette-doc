@@ -9,11 +9,11 @@ icon: "money-simple-from-bracket"
 ## Sources
 
 ```bash
-curl https://api.keette.com/v1/payins/sources \
+curl "https://api.keette.com/v1/payins/sources?target_currency=NGN" \
   -H "Authorization: Bearer sk_test_…"
 ```
 
-Use the returned source ids / methods when building prepare and create payloads.
+`target_currency` is required. Use the returned source ids / methods when building prepare and create payloads.
 
 ## Flow
 

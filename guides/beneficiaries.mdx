@@ -8,7 +8,7 @@ A **beneficiary** is a saved payout destination (bank account, mobile money, sta
 
 ## Flow
 
-1. Inspect [corridors](/guides/corridors) for the scheme and required fields
+1. Inspect [corridors](/guides/corridors) for the scheme and required routing field keys
 2. `POST /v1/beneficiaries` with those fields
 3. Pass `beneficiary_id` to [payouts](/guides/payouts)
 
@@ -17,17 +17,43 @@ curl https://api.keette.com/v1/beneficiaries \
   -H "Authorization: Bearer sk_test_…" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "Ada Okonkwo",
-    "scheme": "ngn_bank",
+    "kind": "individual",
+    "first_name": "Ada",
+    "last_name": "Okoye",
+    "email": "ada@example.com",
     "currency": "NGN",
-    "account_number": "0123456789",
-    "bank_code": "058"
+    "country": "NG",
+    "scheme": "ng_nip",
+    "holder_name": "Ada Okoye",
+    "address": {
+      "line_1": "12 Admiralty Way",
+      "city": "Lagos",
+      "country": "NG"
+    },
+    "routing": {
+      "bank_code": "058",
+      "account_number": "0123456789"
+    }
   }'
 ```
 
+### Required shape
+
+| Field | Notes |
+| ----- | ----- |
+| `kind` | `individual` or `business` (`person` is accepted as an alias of `individual`) |
+| `first_name` / `last_name` | Required when `kind` is individual |
+| `business_name` | Required when `kind` is business |
+| `email` | Required |
+| `address` | `line_1`, `city`, and `country` required |
+| `currency` / `scheme` | Must match an offer from `GET /corridors` |
+| `routing` | Keys match corridor field `key` values (e.g. `bankCode`). Snake_case aliases such as `bank_code` are accepted |
+
+`holder_name` is optional; when omitted it defaults to the individual or business name.
+
 ## Updates and archive
 
-- `PATCH /v1/beneficiaries/{id}` — change mutable fields (name, metadata)
+- `PATCH /v1/beneficiaries/{id}` — mutable fields only: `nickname`, `email`, `relationship`, `address`
 - `POST /v1/beneficiaries/{id}/archive` — soft-delete; existing payouts keep their snapshot
 
 List with `GET /v1/beneficiaries`. Fetch one with `GET /v1/beneficiaries/{id}`.
