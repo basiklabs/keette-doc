@@ -1,0 +1,52 @@
+---
+title: "Products"
+description: "Commerce catalogue — one-time and recurring items."
+icon: "box"
+---
+
+Catalogue items you sell. `kind` is `one_time` or `recurring`. Recurring products need `billing_interval` (`week`, `month`, or `year`).
+
+```bash
+# Create a one-time product
+curl https://api.keette.com/v1/products \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Setup fee",
+    "description": "One-time onboarding",
+    "kind": "one_time",
+    "delivery": "service",
+    "currency": "USDC",
+    "amount": 25
+  }'
+
+# Create a recurring product
+curl https://api.keette.com/v1/products \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Pro plan",
+    "description": "Monthly access",
+    "kind": "recurring",
+    "delivery": "digital",
+    "currency": "KES",
+    "amount": 1500,
+    "billing_interval": "month",
+    "pass_fees_to_payer": true
+  }'
+```
+
+| Method | Path |
+| ------ | ---- |
+| `GET` | `/v1/products` |
+| `POST` | `/v1/products` |
+| `GET` | `/v1/products/{id}` |
+| `PATCH` | `/v1/products/{id}` |
+| `POST` | `/v1/products/{id}/archive` |
+
+Responses use `object: "commerce_product"` with nested `pricing` (money + fees) and `media` (images / URL). Prefer `amount_minor` when you need exact Ledger integers; otherwise `amount` is accepted as a major-unit float.
+
+## Next
+
+- [Customers](/guides/commerce-customers)
+- [API reference — Products](/api-reference/introduction)

@@ -7,17 +7,18 @@ This tab is the **API reference** — endpoint playgrounds generated from [`open
 
 Authenticate with `Authorization: Bearer sk_live_…` or `sk_test_…`. See [Authentication](/auth/overview) and [Environments](/environments) in Guides.
 
-Playground default base URL (local tunnel for now):
+Playground default base URL:
 
 ```text
-https://1178-41-90-137-132.ngrok-free.app/v1
+https://api.keette.com/v1
 ```
 
-Production remains `https://api.keette.com/v1`. Live vs sandbox is selected by your API key, not by a separate host.
+Live vs sandbox is selected by your API key, not by a separate host.
 
 ## Suggested order
 
-Build a beneficiary → payout flow with **Utilities** first (`scheme` from corridors, `bank_code` from banks), then Beneficiaries, then Payouts.
+- **Money movement:** Utilities (`scheme` / banks) → Beneficiaries → Payouts.
+- **Commerce:** [Commerce guide](/guides/commerce) → Products → Customers → Checkout → [webhooks](/webhooks/events#commerce).
 
 ## Available now
 
@@ -33,3 +34,9 @@ Build a beneficiary → payout flow with **Utilities** first (`scheme` from corr
 | Payins | [Sources](/api-reference/payins/sources), [Fee](/api-reference/payins/payin-fee), [Preview](/api-reference/payins/payin-preview), [Prepare](/api-reference/payins/prepare-payin), [Create](/api-reference/payins/create-payin), [Get](/api-reference/payins/get-payin) |
 | Transactions | [Transactions](/api-reference/transactions/transactions), [Transaction](/api-reference/transactions/transaction) |
 | Webhooks | [Ping](/api-reference/webhooks/ping), [Events](/api-reference/webhooks/events), [Event](/api-reference/webhooks/event) |
+| Products | [Get](/api-reference/products/product), [List](/api-reference/products/products), [Create](/api-reference/products/create-product), [Update](/api-reference/products/update-product), [Archive](/api-reference/products/archive-product) |
+| Customers | [Get](/api-reference/customers/customer), [List](/api-reference/customers/customers), [Transactions](/api-reference/customers/transactions), [Attach](/api-reference/customers/attach-product), [Detach](/api-reference/customers/detach-product), [Create](/api-reference/customers/create-customer), [Update](/api-reference/customers/update-customer), [Archive](/api-reference/customers/archive-customer) |
+| Subscriptions | [Add](/api-reference/subscriptions/add-subscription), [List](/api-reference/subscriptions/subscriptions), [Update](/api-reference/subscriptions/update-subscription) |
+| Invoices | [Get](/api-reference/invoices/invoice), [List](/api-reference/invoices/invoices), [Void](/api-reference/invoices/void-invoice), [Create](/api-reference/invoices/create-invoice) |
+| Checkouts | [Create](/api-reference/checkouts/create-checkout), [Verify payment](/api-reference/checkouts/verify-payment), [Simulate transfer](/api-reference/checkouts/simulate-transfer) |
+| Commerce ops | [Dashboard](/api-reference/commerce/dashboard) |

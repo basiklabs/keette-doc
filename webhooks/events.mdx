@@ -138,3 +138,97 @@ When the payout has supporting files, `documents` lists each one with a signed S
 | `event.payin.failed` | Deposit failed or expired |
 
 Created events carry method/channel and float amounts. Completed events add `gross` / `fee` / `net` (and `*_minor`), `rail`, optional `sender` details, `fees`, and `timeline`.
+
+## Commerce
+
+Hosted checkout collections. Subscribe when you sell products or subscriptions. See [Commerce](/guides/commerce).
+
+| Type | When |
+| ---- | ---- |
+| `event.commerce.checkout.initiated` | Checkout (pay link / intent) created |
+| `event.commerce.checkout.cancelled` | Checkout cancelled before payment |
+| `event.commerce.checkout.payment_succeeded` | Checkout paid on a rail |
+| `event.commerce.checkout.payment_failed` | Checkout payment failed or expired |
+| `event.commerce.invoice.payment_succeeded` | Linked invoice marked paid (same pay) |
+| `event.commerce.invoice.payment_failed` | Linked invoice payment failed or expired |
+
+`data.object` is `commerce_checkout` or `commerce_invoice`. Money uses float + `*_minor` at **commerce scale 2 for every currency** (including USDC/USDT — `7` USDT → `amount_minor` 700). `method` is the rail (`crypto`, `ngn_va`, `kes_stk`). Failed events may include `reason`.
+
+### Example — `event.commerce.checkout.payment_succeeded`
+
+```json
+{
+  "object": "commerce_checkout",
+  "id": "00000000-0000-0000-0000-000000000021",
+  "business_id": "00000000-0000-0000-0000-000000000099",
+  "checkout_id": "00000000-0000-0000-0000-000000000021",
+  "invoice_id": "00000000-0000-0000-0000-000000000022",
+  "status": "succeeded",
+  "method": "crypto",
+  "currency": "USDC",
+  "scale": 2,
+  "amount": 25.00,
+  "amount_minor": 2500,
+  "stan": "CTX-…",
+  "transaction_id": "00000000-0000-0000-0000-000000000030"
+}
+```
+
+### Example — `event.commerce.checkout.payment_failed`
+
+```json
+{
+  "object": "commerce_checkout",
+  "id": "00000000-0000-0000-0000-000000000021",
+  "business_id": "00000000-0000-0000-0000-000000000099",
+  "checkout_id": "00000000-0000-0000-0000-000000000021",
+  "status": "failed",
+  "method": "ngn_va",
+  "currency": "NGN",
+  "scale": 2,
+  "amount": 50000.00,
+  "amount_minor": 5000000,
+  "reason": "expired",
+  "stan": "CTX-…"
+}
+```
+
+### Example — `event.commerce.invoice.payment_succeeded`
+
+```json
+{
+  "object": "commerce_invoice",
+  "id": "00000000-0000-0000-0000-000000000022",
+  "business_id": "00000000-0000-0000-0000-000000000099",
+  "checkout_id": "00000000-0000-0000-0000-000000000021",
+  "invoice_id": "00000000-0000-0000-0000-000000000022",
+  "status": "succeeded",
+  "method": "crypto",
+  "currency": "USDC",
+  "scale": 2,
+  "amount": 25.00,
+  "amount_minor": 2500,
+  "stan": "CTX-…",
+  "transaction_id": "00000000-0000-0000-0000-000000000030"
+}
+```
+
+### Example — `event.commerce.invoice.payment_failed`
+
+```json
+{
+  "object": "commerce_invoice",
+  "id": "00000000-0000-0000-0000-000000000022",
+  "business_id": "00000000-0000-0000-0000-000000000099",
+  "checkout_id": "00000000-0000-0000-0000-000000000021",
+  "invoice_id": "00000000-0000-0000-0000-000000000022",
+  "status": "failed",
+  "method": "kes_stk",
+  "currency": "KES",
+  "scale": 2,
+  "amount": 1500.00,
+  "amount_minor": 150000,
+  "reason": "declined",
+  "stan": "CTX-…"
+}
+```

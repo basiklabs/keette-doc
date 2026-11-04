@@ -1,0 +1,46 @@
+---
+title: "Commerce"
+description: "Sell products and subscriptions; collect via hosted checkout."
+icon: "store"
+---
+
+**Commerce** lets a business workspace sell one-time and recurring products, bill customers, and collect through hosted checkout (crypto, NGN bank transfer, KES MoMo). Collected funds clear first, then settle into your book — available balance is **not** credited on collect.
+
+Requires a business workspace with Commerce enabled. Money amounts are major-unit floats with 6 decimal places plus `*_minor` Ledger integers — see [Money amounts](/guides/money).
+
+## Typical flow
+
+<Steps>
+  <Step title="Create a product">
+    [`POST /v1/products`](/guides/commerce-products) — one-time or recurring catalogue item. Or skip ahead with a one-shot checkout.
+  </Step>
+  <Step title="Create a customer">
+    [`POST /v1/customers`](/guides/commerce-customers), then attach a product or create an invoice / subscription.
+  </Step>
+  <Step title="Open checkout">
+    [`POST /v1/checkouts`](/guides/commerce-checkout) returns a hosted `checkout_url`. Send it to the payer.
+  </Step>
+  <Step title="Verify payment">
+    Poll [`GET /v1/checkouts/{id}/payment`](/guides/commerce-checkout) or listen for [`event.commerce.*`](/webhooks/events#commerce) webhooks.
+  </Step>
+</Steps>
+
+## Guides in this section
+
+- [Products](/guides/commerce-products) — catalogue
+- [Customers](/guides/commerce-customers) — payers and product attach
+- [Billing](/guides/commerce-billing) — subscriptions and invoices
+- [Checkout](/guides/commerce-checkout) — create pay link + verify payment
+- [Settlement](/guides/commerce-settlement) — when funds reach your book
+
+## Dashboard
+
+In the Keette app, **Overview → Commerce** shows the same KPIs as [`GET /v1/commerce/dashboard`](/api-reference/commerce/dashboard): volume, success rate, method mix, trend, and recent collections. Use the API for your own ops dashboards; use the app for day-to-day monitoring.
+
+## Settlement
+
+Successful collections clear first; Keette settles them into your book automatically. Do not treat a paid checkout as spendable available balance until settled. See [Settlement](/guides/commerce-settlement).
+
+## Webhooks
+
+Subscribe to `event.commerce.checkout.*` and `event.commerce.invoice.*` for payment outcomes — details and examples on [Event types — Commerce](/webhooks/events#commerce).

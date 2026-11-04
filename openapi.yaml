@@ -6,13 +6,11 @@ info:
     Public HTTP API for Keette workspaces. One base URL — live vs sandbox is
     selected by your API key (`sk_live_…` / `sk_test_…`).
 
-    Endpoints are added as each implementation phase ships.
+    Authenticate with `Authorization: Bearer sk_live_…` or `sk_test_…`.
   contact:
     name: Keette Support
     email: talk@keette.com
 servers:
-  - url: https://1178-41-90-137-132.ngrok-free.app/v1
-    description: Local tunnel (ngrok → core :8080)
   - url: https://api.keette.com/v1
     description: Production
 security:
@@ -41,6 +39,16 @@ tags:
     description: FX between your own books
   - name: Webhooks
     description: Durable event log, ping, and webhook delivery helpers
+  - name: Products
+    description: Commerce catalogue items (one-time and recurring)
+  - name: Customers
+    description: Commerce payers and product attachments
+  - name: Subscriptions
+    description: Recurring commerce billing
+  - name: Invoices
+    description: Commerce invoices
+  - name: Checkouts
+    description: Hosted commerce pay sessions
 paths:
   /me:
     get:
@@ -1596,6 +1604,678 @@ paths:
         "404":
           $ref: "#/components/responses/Forbidden"
 
+  /products:
+    get:
+      operationId: listProducts
+      tags: [Products]
+      summary: Products
+      description: |
+        List catalogue products for the workspace. Requires Commerce on a
+        business account.
+      parameters:
+        - name: page
+          in: query
+          description: 1-based page index.
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          description: Page size.
+          schema: { type: integer, default: 25 }
+        - name: status
+          in: query
+          description: "`active` or `archived`."
+          schema: { type: string }
+        - name: kind
+          in: query
+          description: "`one_time` or `recurring`."
+          schema: { type: string }
+        - name: q
+          in: query
+          description: Free-text search on name / description.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Product list
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createProduct
+      tags: [Products]
+      summary: Create Product
+      description: |
+        Create a one-time or recurring catalogue product. Recurring products
+        require `billing_interval` (`week`, `month`, or `year`). Pass either
+        `amount` (major units) or `amount_minor` (Ledger integer).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+            examples:
+              one_time:
+                summary: One-time USDC fee
+                value:
+                  name: Setup fee
+                  description: One-time onboarding
+                  kind: one_time
+                  delivery: service
+                  currency: USDC
+                  amount: 25
+              recurring:
+                summary: Monthly KES plan
+                value:
+                  name: Pro plan
+                  description: Monthly access
+                  kind: recurring
+                  delivery: digital
+                  currency: KES
+                  amount: 1500
+                  billing_interval: month
+                  pass_fees_to_payer: true
+      responses:
+        "200":
+          description: Created product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [Products]
+      summary: Product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      operationId: updateProduct
+      tags: [Products]
+      summary: Update Product
+      description: |
+        Update an active product. Archived products cannot be edited.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductRequest"
+            examples:
+              rename:
+                value:
+                  name: Pro plan (updated)
+                  description: Monthly access with support
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /products/{id}/archive:
+    post:
+      operationId: archiveProduct
+      tags: [Products]
+      summary: Archive Product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Archived product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceProduct"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /customers:
+    get:
+      operationId: listCustomers
+      tags: [Customers]
+      summary: Customers
+      description: |
+        List commerce customers for the workspace. Requires Commerce on a
+        business account.
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 25 }
+        - name: status
+          in: query
+          description: "`active` or `archived`."
+          schema: { type: string }
+        - name: country
+          in: query
+          description: ISO country code filter.
+          schema: { type: string }
+        - name: q
+          in: query
+          description: Free-text search on name / email / company.
+          schema: { type: string }
+      responses:
+        "200":
+          description: Customer list
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createCustomer
+      tags: [Customers]
+      summary: Create Customer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCustomerRequest"
+            examples:
+              basic:
+                value:
+                  name: Ada Okoye
+                  email: ada@example.com
+                  country: NG
+                  address:
+                    line_1: 12 Admiralty Way
+                    city: Lagos
+                    country: NG
+      responses:
+        "200":
+          description: Created customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceCustomer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /customers/{id}:
+    get:
+      operationId: getCustomer
+      tags: [Customers]
+      summary: Customer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceCustomer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    patch:
+      operationId: updateCustomer
+      tags: [Customers]
+      summary: Update Customer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCustomerRequest"
+            examples:
+              contact:
+                value:
+                  email: ada+billing@example.com
+                  phone: "+2348012345678"
+      responses:
+        "200":
+          description: Updated customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceCustomer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /customers/{id}/archive:
+    post:
+      operationId: archiveCustomer
+      tags: [Customers]
+      summary: Archive Customer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Archived customer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceCustomer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /customers/{id}/products/{product_id}:
+    post:
+      operationId: attachCustomerProduct
+      tags: [Customers]
+      summary: Attach Product
+      description: |
+        Link an active product to an active customer. Recurring products also
+        create a subscription and open invoice; one-time products create an
+        open invoice only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer id.
+          schema: { type: string, format: uuid }
+        - name: product_id
+          in: path
+          required: true
+          description: Product id.
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttachProductRequest"
+            examples:
+              default:
+                value: {}
+      responses:
+        "200":
+          description: Attach result (attachment plus optional subscription / invoice)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceAttachResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      operationId: detachCustomerProduct
+      tags: [Customers]
+      summary: Detach Product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer id.
+          schema: { type: string, format: uuid }
+        - name: product_id
+          in: path
+          required: true
+          description: Product id.
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Detach confirmation
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /customers/{id}/subscriptions:
+    get:
+      operationId: listCustomerSubscriptions
+      tags: [Subscriptions]
+      summary: Subscriptions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer id.
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Subscription list
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createCustomerSubscription
+      tags: [Subscriptions]
+      summary: Add Subscription
+      description: |
+        Attach a **recurring** product to the customer. Creates the subscription
+        and an open invoice. For one-time products use create invoice or attach product.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer id.
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id]
+              properties:
+                product_id: { type: string, format: uuid }
+                start_at: { type: string, format: date-time }
+                due_at: { type: string, format: date-time }
+            examples:
+              monthly:
+                value:
+                  product_id: "00000000-0000-0000-0000-000000000001"
+      responses:
+        "200":
+          description: Attach result with subscription + invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceAttachResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /customers/{id}/invoices:
+    get:
+      operationId: listCustomerInvoices
+      tags: [Invoices]
+      summary: Invoices
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer id.
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 25 }
+        - name: status
+          in: query
+          description: "`draft`, `open`, `paid`, `void`, or `overdue`."
+          schema: { type: string }
+      responses:
+        "200":
+          description: Invoice list
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createCustomerInvoice
+      tags: [Invoices]
+      summary: Create Invoice
+      description: |
+        Create an open invoice for a **one-time** product. Recurring products
+        are billed by attaching the product (which creates a subscription).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer id.
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvoiceRequest"
+            examples:
+              one_time:
+                value:
+                  product_id: "00000000-0000-0000-0000-000000000001"
+      responses:
+        "200":
+          description: Created invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceInvoice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /subscriptions/{id}:
+    patch:
+      operationId: updateSubscription
+      tags: [Subscriptions]
+      summary: Update Subscription
+      description: |
+        Set status to `active`, `paused`, or `canceled`. Canceled subscriptions
+        cannot be reactivated. Cancel voids open invoices and detaches the product.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSubscriptionRequest"
+            examples:
+              pause:
+                value: { status: paused }
+              cancel:
+                value: { status: canceled }
+      responses:
+        "200":
+          description: Updated subscription
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceSubscription"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /invoices/{id}:
+    get:
+      operationId: getInvoice
+      tags: [Invoices]
+      summary: Invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceInvoice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /invoices/{id}/void:
+    post:
+      operationId: voidInvoice
+      tags: [Invoices]
+      summary: Void Invoice
+      description: Void an unpaid invoice. Paid invoices cannot be voided.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Voided invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceInvoice"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /checkouts:
+    post:
+      operationId: createCheckout
+      tags: [Checkouts]
+      summary: Create Checkout
+      description: |
+        Open a hosted pay session. One-shot body (amount + customer) creates a
+        one-time product, customer, and invoice underneath. Or pass `invoice_id`
+        for an existing unpaid invoice. Returns nested `business`, `product`,
+        `payer`, and `host` (with signed `ckt_…` `checkout_url`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCheckoutRequest"
+            examples:
+              one_shot:
+                summary: One-shot payment
+                value:
+                  name: Setup fee
+                  description: Onboarding
+                  currency: USDC
+                  amount: 25
+                  customer_name: Ada Okoye
+                  customer_email: ada@example.com
+                  success_url: https://yoursite.com/paid
+                  cancel_url: https://yoursite.com/cancel
+                  fields_editable: false
+                  brand_color: "#061F00"
+              from_invoice:
+                summary: Existing invoice
+                value:
+                  invoice_id: "00000000-0000-0000-0000-000000000022"
+                  success_url: https://yoursite.com/paid
+      responses:
+        "200":
+          description: Nested checkout with signed hosted URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutCreated"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /checkouts/{id}/payment:
+    get:
+      operationId: verifyCheckoutPayment
+      tags: [Checkouts]
+      summary: Verify Payment
+      description: |
+        Poll payment status for a checkout. Nested `payment` + `amount` sections;
+        top-level `paid` is true when settled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutPayment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /checkouts/{id}/simulate-transfer:
+    post:
+      operationId: simulateCheckoutTransfer
+      tags: [Checkouts]
+      summary: Simulate Transfer
+      description: |
+        Sandbox only (`sk_test_…`). Simulates an NGN bank transfer into the
+        awaiting pay-with-transfer session on this checkout — same outcome as a
+        live credit.
+
+        Open the hosted checkout, choose bank transfer, copy the account details,
+        click **I've made a payment**, then call this endpoint.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Checkout id from `POST /checkouts` or the hosted session.
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Simulation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSimulateTransfer"
+              examples:
+                succeeded:
+                  value:
+                    object: commerce_checkout_simulate_transfer
+                    id: "00000000-0000-0000-0000-000000000033"
+                    checkout_id: "00000000-0000-0000-0000-000000000033"
+                    rail_session_id: "00000000-0000-0000-0000-000000000044"
+                    status: succeeded
+                    message: Simulated transfer confirmed
+                    reason: simulated
+                    livemode: false
+                    environment: sandbox
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Called outside sandbox (`sk_live_…` or live workspace)
+        "404":
+          description: Checkout not found
+  /customers/{id}/transactions:
+    get:
+      operationId: listCustomerTransactions
+      tags: [Customers]
+      summary: Transactions
+      description: Commerce collection rows for a customer.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Customer id.
+          schema: { type: string, format: uuid }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 25 }
+      responses:
+        "200":
+          description: Transaction list
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /commerce/dashboard:
+    get:
+      operationId: commerceDashboard
+      tags: [Commerce]
+      summary: Dashboard
+      description: |
+        Commerce home KPIs — nested `volume`, `activity`, `mix`, `months`, and
+        `recent` collections.
+      parameters:
+        - name: recent
+          in: query
+          description: How many recent collections to include (default 8).
+          schema: { type: integer, default: 8 }
+      responses:
+        "200":
+          description: Dashboard payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommerceDashboard"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2815,3 +3495,551 @@ components:
           type: string
           enum: [live, sandbox]
           description: Environment of the creating API key.
+
+    CreateProductRequest:
+      type: object
+      required: [name, description, kind, currency]
+      properties:
+        name:
+          type: string
+          description: Display name (1–120 characters).
+        description:
+          type: string
+          description: Product description (1–4000 characters).
+        kind:
+          type: string
+          enum: [one_time, recurring]
+        delivery:
+          type: string
+          enum: [digital, physical, service]
+          description: Defaults to `digital`.
+        currency:
+          type: string
+          description: ISO currency or stablecoin code (e.g. `KES`, `USDC`).
+        amount:
+          type: number
+          format: double
+          description: >
+            Price in major units (2dp for all currencies, including USDC/USDT).
+            Use with or instead of `amount_minor`.
+        amount_minor:
+          type: integer
+          format: int64
+          description: >
+            Price in commerce minor units (always 2dp — USDC `25.00` → 2500,
+            not Ledger 6dp).
+        billing_interval:
+          type: string
+          enum: [week, month, year]
+          description: Required when `kind` is `recurring`.
+        pass_fees_to_payer:
+          type: boolean
+          description: When true, checkout quotes add the commerce fee onto the payer total.
+        reminder_days_before:
+          type: integer
+          description: Days before due to remind (0–90). Defaults to 3 for recurring.
+        image_url:
+          type: string
+          description: Primary image URL (or data URL).
+        url:
+          type: string
+          description: Optional product page URL.
+        images:
+          type: array
+          items: { type: string }
+          description: Extra gallery image URLs.
+
+    UpdateProductRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        kind:
+          type: string
+          enum: [one_time, recurring]
+        delivery:
+          type: string
+          enum: [digital, physical, service]
+        currency: { type: string }
+        amount: { type: number, format: double }
+        amount_minor: { type: integer, format: int64 }
+        billing_interval:
+          type: string
+          enum: [week, month, year]
+        pass_fees_to_payer: { type: boolean }
+        reminder_days_before: { type: integer }
+        image_url: { type: string }
+        url: { type: string }
+        images:
+          type: array
+          items: { type: string }
+
+    Money:
+      type: object
+      description: "Nested money section (object: money)."
+      properties:
+        object: { type: string, enum: [money] }
+        note: { type: string }
+        currency: { type: string }
+        scale: { type: integer }
+        amount: { type: number, format: double }
+        amount_minor: { type: integer, format: int64 }
+        clear_amount: { type: string }
+
+    CommerceProduct:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [commerce_product]
+        note: { type: string }
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        kind:
+          type: string
+          enum: [one_time, recurring]
+        delivery:
+          type: string
+          enum: [digital, physical, service]
+        status:
+          type: string
+          enum: [active, archived]
+        pricing:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_product_pricing] }
+            note: { type: string }
+            price: { $ref: "#/components/schemas/Money" }
+            pass_fees_to_payer: { type: boolean }
+            reminder_days_before: { type: integer }
+            billing_interval:
+              type: string
+              enum: [week, month, year]
+        media:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_product_media] }
+            note: { type: string }
+            image_url: { type: string }
+            url: { type: string }
+            images:
+              type: array
+              items: { type: string }
+        stan: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        archived_at: { type: string, format: date-time }
+        livemode: { type: boolean }
+        environment:
+          type: string
+          enum: [live, sandbox]
+
+    CreateCustomerRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, description: Customer display name. }
+        email: { type: string, format: email }
+        phone: { type: string }
+        country: { type: string, description: ISO country code. }
+        company: { type: string }
+        notes: { type: string }
+        address:
+          $ref: "#/components/schemas/CommerceAddress"
+
+    UpdateCustomerRequest:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        country: { type: string }
+        company: { type: string }
+        notes: { type: string }
+        address:
+          $ref: "#/components/schemas/CommerceAddress"
+
+    CommerceAddress:
+      type: object
+      properties:
+        line_1: { type: string }
+        line_2: { type: string }
+        city: { type: string }
+        state: { type: string }
+        postal_code: { type: string }
+        country: { type: string }
+
+    CommerceCustomer:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [commerce_customer]
+        note: { type: string }
+        id: { type: string, format: uuid }
+        name: { type: string }
+        status:
+          type: string
+          enum: [active, archived]
+        contact:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_customer_contact] }
+            note: { type: string }
+            email: { type: string }
+            phone: { type: string }
+            company: { type: string }
+            country: { type: string }
+        address:
+          allOf:
+            - $ref: "#/components/schemas/CommerceAddress"
+            - type: object
+              properties:
+                object: { type: string, enum: [address] }
+                note: { type: string }
+        stats:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_customer_stats] }
+            note: { type: string }
+            currency: { type: string }
+            scale: { type: integer }
+            total_spent: { type: number, format: double }
+            total_spent_minor: { type: integer, format: int64 }
+            payments: { type: integer }
+            active_subscriptions: { type: integer }
+            active_plan: { type: string }
+            open_invoices: { type: integer }
+            overdue_invoices: { type: integer }
+            last_payment_at: { type: string, format: date-time }
+        notes: { type: string }
+        stan: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        archived_at: { type: string, format: date-time }
+        livemode: { type: boolean }
+        environment:
+          type: string
+          enum: [live, sandbox]
+
+    AttachProductRequest:
+      type: object
+      properties:
+        start_at:
+          type: string
+          format: date-time
+          description: Subscription period start (RFC3339). Defaults to now.
+        due_at:
+          type: string
+          format: date-time
+          description: Invoice due date (RFC3339).
+
+    CommerceAttachResult:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [commerce_attach_result]
+        attachment:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_attachment] }
+            attachment_id: { type: string, format: uuid }
+            attached_at: { type: string, format: date-time }
+            product:
+              $ref: "#/components/schemas/CommerceProduct"
+        subscription:
+          $ref: "#/components/schemas/CommerceSubscription"
+        invoice:
+          $ref: "#/components/schemas/CommerceInvoice"
+        livemode: { type: boolean }
+        environment:
+          type: string
+          enum: [live, sandbox]
+
+    CreateInvoiceRequest:
+      type: object
+      required: [product_id]
+      properties:
+        product_id:
+          type: string
+          format: uuid
+          description: One-time product id.
+        due_at:
+          type: string
+          format: date-time
+          description: Optional due date (RFC3339). Defaults to now.
+
+    UpdateSubscriptionRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, paused, canceled]
+
+    CommerceSubscription:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [commerce_subscription]
+        note: { type: string }
+        id: { type: string, format: uuid }
+        customer_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [active, paused, canceled, past_due]
+        plan:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_subscription_plan] }
+            note: { type: string }
+            product_id: { type: string, format: uuid }
+            product_name: { type: string }
+            billing_interval:
+              type: string
+              enum: [week, month, year]
+            pass_fees_to_payer: { type: boolean }
+            reminder_days_before: { type: integer }
+            price: { $ref: "#/components/schemas/Money" }
+        period:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_subscription_period] }
+            note: { type: string }
+            current_period_start: { type: string, format: date-time }
+            current_period_end: { type: string, format: date-time }
+            next_billing_at: { type: string, format: date-time }
+            canceled_at: { type: string, format: date-time }
+        stan: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        livemode: { type: boolean }
+        environment:
+          type: string
+          enum: [live, sandbox]
+
+    CommerceInvoice:
+      type: object
+      properties:
+        object:
+          type: string
+          enum: [commerce_invoice]
+        note: { type: string }
+        id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [draft, open, paid, void, overdue]
+        totals:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_invoice_totals] }
+            note: { type: string }
+            pass_fees_to_payer: { type: boolean }
+            price: { $ref: "#/components/schemas/Money" }
+            fee: { $ref: "#/components/schemas/Money" }
+        refs:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_invoice_refs] }
+            note: { type: string }
+            customer_id: { type: string, format: uuid }
+            product_id: { type: string, format: uuid }
+            subscription_id: { type: string, format: uuid }
+            product_name: { type: string }
+        due_at: { type: string, format: date-time }
+        paid_at: { type: string, format: date-time }
+        voided_at: { type: string, format: date-time }
+        stan: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        livemode: { type: boolean }
+        environment:
+          type: string
+          enum: [live, sandbox]
+
+    CreateCheckoutRequest:
+      type: object
+      properties:
+        invoice_id:
+          type: string
+          format: uuid
+          description: Existing unpaid invoice (skip one-shot fields when set).
+        customer_id:
+          type: string
+          format: uuid
+          description: Optional existing customer for one-shot payments.
+        name:
+          type: string
+          description: Product / line name for one-shot payments.
+        description: { type: string }
+        currency: { type: string }
+        amount:
+          type: number
+          format: double
+          description: >
+            Major-unit amount (or use amount_minor). Commerce always uses
+            2 decimal places — including USDC/USDT (`6` → `amount_minor` 600).
+        amount_minor:
+          type: integer
+          format: int64
+          description: >
+            Exact commerce minor units (2dp for all currencies, including
+            USDC/USDT). Prefer `amount` in major units unless you need exact cents.
+        customer_name: { type: string }
+        customer_email: { type: string, format: email }
+        pass_fees_to_payer: { type: boolean }
+        success_url:
+          type: string
+          format: uri
+          description: Redirect after successful pay.
+        cancel_url:
+          type: string
+          format: uri
+        redirect_url:
+          type: string
+          format: uri
+          description: Alias for success_url when success_url is empty.
+        fields_editable:
+          type: boolean
+          description: When true, payer can edit name / email / amount on the hosted page.
+        brand_color:
+          type: string
+          description: "`#RRGGBB` primary colour on the hosted page."
+
+    CheckoutCreated:
+      type: object
+      properties:
+        object: { type: string, enum: [commerce_checkout] }
+        note: { type: string }
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [open, paid, expired, canceled] }
+        checkout_url: { type: string, format: uri }
+        amount: { $ref: "#/components/schemas/Money" }
+        business:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_business] }
+            note: { type: string }
+            name: { type: string }
+            description: { type: string }
+            logo_url: { type: string }
+        product:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_product_line] }
+            note: { type: string }
+            product_id: { type: string, format: uuid }
+            name: { type: string }
+            description: { type: string }
+            image_url: { type: string }
+        payer:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_payer] }
+            note: { type: string }
+            name: { type: string }
+            email: { type: string }
+        host:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_checkout_host] }
+            note: { type: string }
+            checkout_url: { type: string, format: uri }
+            success_url: { type: string, format: uri }
+            cancel_url: { type: string, format: uri }
+            fields_editable: { type: boolean }
+            brand_color: { type: string }
+        invoice_id: { type: string, format: uuid }
+        customer_id: { type: string, format: uuid }
+        expires_at: { type: string, format: date-time }
+
+    CheckoutPayment:
+      type: object
+      properties:
+        object: { type: string, enum: [commerce_checkout] }
+        note: { type: string }
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [open, paid, expired, canceled] }
+        paid: { type: boolean }
+        payment:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_payment] }
+            note: { type: string }
+            status: { type: string }
+            paid: { type: boolean }
+            paid_at: { type: string, format: date-time }
+            expires_at: { type: string, format: date-time }
+        amount: { $ref: "#/components/schemas/Money" }
+        checkout_url: { type: string, format: uri }
+
+    CheckoutSimulateTransfer:
+      type: object
+      properties:
+        object: { type: string, enum: [commerce_checkout_simulate_transfer] }
+        id: { type: string, format: uuid }
+        checkout_id: { type: string, format: uuid }
+        rail_session_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [accepted, succeeded, pending, failed]
+        message: { type: string }
+        reason: { type: string }
+        livemode: { type: boolean }
+        environment: { type: string, enum: [sandbox] }
+
+    CommerceDashboard:
+      type: object
+      properties:
+        object: { type: string, enum: [commerce_dashboard] }
+        note: { type: string }
+        livemode: { type: boolean }
+        environment: { type: string, enum: [live, sandbox] }
+        volume:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_dashboard_volume] }
+            note: { type: string }
+            gross_currency: { type: string }
+            settled_currency: { type: string }
+            gross_this_month: { type: number, format: double }
+            gross_this_month_minor: { type: integer, format: int64 }
+            gross_prev_month: { type: number, format: double }
+            gross_prev_month_minor: { type: integer, format: int64 }
+            settled_this_month: { type: number, format: double }
+            settled_this_month_minor: { type: integer, format: int64 }
+        activity:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_dashboard_activity] }
+            note: { type: string }
+            attempts: { type: integer, format: int64 }
+            succeeded: { type: integer, format: int64 }
+            failed: { type: integer, format: int64 }
+        mix:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_dashboard_mix] }
+            note: { type: string }
+            crypto: { type: integer, format: int64 }
+            mobile_money: { type: integer, format: int64 }
+            bank_transfer: { type: integer, format: int64 }
+        months:
+          type: array
+          items:
+            type: object
+            properties:
+              object: { type: string, enum: [commerce_dashboard_month] }
+              label: { type: string }
+              this_year: { type: number, format: double }
+              this_year_minor: { type: integer, format: int64 }
+              prev_year: { type: number, format: double }
+              prev_year_minor: { type: integer, format: int64 }
+        recent:
+          type: array
+          items:
+            type: object
+            description: commerce_transaction plus optional nested customer

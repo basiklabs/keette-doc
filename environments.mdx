@@ -12,14 +12,6 @@ All public requests use the same host and path prefix:
 https://api.keette.com/v1
 ```
 
-For local API playground testing, the docs default to the current ngrok tunnel:
-
-```text
-https://1178-41-90-137-132.ngrok-free.app/v1
-```
-
-(That forwards to core on `:8080`. Switch the OpenAPI server back to production when the tunnel is down.)
-
 There is no separate sandbox hostname for v1. The **API key** selects the environment:
 
 | Key prefix   | Environment | Money and rails        |
@@ -49,6 +41,47 @@ Other NUBANs can be saved as beneficiaries in sandbox, but partner payout settle
 - Responses include `livemode` / `environment` from the key you used.
 - Prefer `sk_test_…` while integrating; use `sk_live_…` only when you intend real money movement.
 - **Individuals** have no Dev toggle and no sandbox twin — they are always live.
+
+## Test hosted checkout rails (Dev mode)
+
+Turn on **Dev mode** in the dashboard (or call with `sk_test_…`) so checkouts run on the sandbox twin. Hosted pay uses the **same UI and poll loop as live** — nothing auto-completes when the method first appears.
+
+### NGN bank transfer
+
+1. Create an NGN checkout (`POST /checkouts` with `currency: NGN`) using `sk_test_…`.
+2. Open `checkout_url`, choose bank transfer, and copy the one-time account details.
+3. Click **I've made a payment** on the pay page so waiting/polling starts (same as live).
+4. Simulate the inbound transfer:
+
+```bash
+curl -X POST "https://api.keette.com/v1/checkouts/{checkout_id}/simulate-transfer" \
+  -H "Authorization: Bearer sk_test_…"
+```
+
+The pay page confirms and settles like a live credit. Poll `GET /checkouts/{id}/payment` until `paid` is true.
+
+### Crypto (USDC / USDT)
+
+1. Open a checkout that offers crypto and choose **Continue with USDC** or **USDT**.
+2. Send the exact amount on the shown network (or use the Dev sim controls when shown).
+3. Waiting starts after the address is assigned — same as live deposit detection.
+4. When the rail shows **Dev sim**, click **I've paid (Dev)** on the pay page to acknowledge the simulated deposit. Otherwise leave the page polling until the credit is detected.
+
+From a terminal (same ack as the Dev button), with the rail session id from the pay session:
+
+```bash
+curl "http://127.0.0.1:8080/public/commerce/rail-sessions/{rail_session_id}/status?ackPaid=1"
+```
+
+Or run `backend/core/simulate-nuvion-usdt.sh <rail_session_id>`. `ackPaid` only settles **sim** rails in sandbox — live deposits must arrive on-chain (no testnet faucet for USDT).
+
+### Mobile money (KES STK)
+
+1. Open a KES checkout, enter the phone, and submit to send the STK prompt.
+2. Waiting starts only after the prompt is sent — same as live.
+3. Approve the PIN on the handset when prompted, or in local Dev sim the pay page confirms on the next poll after you submit. Restart Payment if you need a new prompt.
+
+Sandbox webhooks (`event.commerce…`) fire on success the same way as live.
 
 ## Webhooks
 

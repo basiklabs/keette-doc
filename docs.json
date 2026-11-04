@@ -20,7 +20,7 @@
   },
   "api": {
     "mdx": {
-      "server": "https://1178-41-90-137-132.ngrok-free.app/v1"
+      "server": "https://api.keette.com/v1"
     },
     "playground": {
       "display": "interactive",
@@ -62,6 +62,18 @@
               "guides/relationships-and-purposes",
               "guides/transactions",
               "guides/beneficiaries"
+            ]
+          },
+          {
+            "group": "Commerce",
+            "icon": "store",
+            "pages": [
+              "guides/commerce",
+              "guides/commerce-products",
+              "guides/commerce-customers",
+              "guides/commerce-billing",
+              "guides/commerce-checkout",
+              "guides/commerce-settlement"
             ]
           },
           {
@@ -167,6 +179,66 @@
             "group": "Webhooks",
             "openapi": "openapi.yaml",
             "pages": ["POST /ping", "GET /events", "GET /events/{id}"]
+          },
+          {
+            "group": "Products",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "GET /products/{id}",
+              "GET /products",
+              "POST /products",
+              "PATCH /products/{id}",
+              "POST /products/{id}/archive"
+            ]
+          },
+          {
+            "group": "Customers",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "GET /customers/{id}",
+              "GET /customers",
+              "GET /customers/{id}/transactions",
+              "POST /customers/{id}/products/{product_id}",
+              "DELETE /customers/{id}/products/{product_id}",
+              "POST /customers",
+              "PATCH /customers/{id}",
+              "POST /customers/{id}/archive"
+            ]
+          },
+          {
+            "group": "Subscriptions",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "POST /customers/{id}/subscriptions",
+              "GET /customers/{id}/subscriptions",
+              "PATCH /subscriptions/{id}"
+            ]
+          },
+          {
+            "group": "Invoices",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "GET /invoices/{id}",
+              "GET /customers/{id}/invoices",
+              "POST /invoices/{id}/void",
+              "POST /customers/{id}/invoices"
+            ]
+          },
+          {
+            "group": "Checkouts",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "POST /checkouts",
+              "GET /checkouts/{id}/payment",
+              "POST /checkouts/{id}/simulate-transfer"
+            ]
+          },
+          {
+            "group": "Commerce ops",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "GET /commerce/dashboard"
+            ]
           }
         ]
       }

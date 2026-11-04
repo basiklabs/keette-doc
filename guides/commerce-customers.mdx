@@ -1,0 +1,48 @@
+---
+title: "Customers"
+description: "Commerce payers — create, update, attach products."
+icon: "users"
+---
+
+Payer records you bill. Create a customer, then attach a product to open an invoice (and a subscription when the product is recurring).
+
+```bash
+# Create customer
+curl https://api.keette.com/v1/customers \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Ada Okoye",
+    "email": "ada@example.com",
+    "country": "NG",
+    "address": {
+      "line_1": "12 Admiralty Way",
+      "city": "Lagos",
+      "country": "NG"
+    }
+  }'
+
+# Attach a product
+curl https://api.keette.com/v1/customers/{customer_id}/products/{product_id} \
+  -X POST \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+| Method | Path |
+| ------ | ---- |
+| `GET` | `/v1/customers` |
+| `POST` | `/v1/customers` |
+| `GET` | `/v1/customers/{id}` |
+| `PATCH` | `/v1/customers/{id}` |
+| `POST` | `/v1/customers/{id}/archive` |
+| `POST` | `/v1/customers/{id}/products/{product_id}` |
+| `DELETE` | `/v1/customers/{id}/products/{product_id}` |
+
+Attach responses use `object: "commerce_attach_result"` with `attachment` and optional `subscription` / `invoice`.
+
+## Next
+
+- [Billing](/guides/commerce-billing)
+- [Products](/guides/commerce-products)

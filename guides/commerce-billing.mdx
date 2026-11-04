@@ -1,0 +1,56 @@
+---
+title: "Billing"
+description: "Subscriptions and invoices for Commerce customers."
+icon: "file-invoice"
+---
+
+## Subscriptions
+
+Add a subscription by attaching a **recurring** product:
+
+```bash
+curl https://api.keette.com/v1/customers/{customer_id}/subscriptions \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id": "{recurring_product_id}"}'
+```
+
+Response nests `subscription` (with `plan` / `period`) and the open `invoice` (with `totals` / `refs`). List with `GET /v1/customers/{id}/subscriptions`. Pause, resume, or cancel with `PATCH /v1/subscriptions/{id}`:
+
+```bash
+curl https://api.keette.com/v1/subscriptions/{id} \
+  -X PATCH \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "paused"}'
+```
+
+`status` is `active`, `paused`, or `canceled`. Canceled subscriptions cannot be reactivated; cancel also voids open invoices and detaches the product.
+
+## Invoices
+
+One-time products can also be invoiced directly:
+
+```bash
+curl https://api.keette.com/v1/customers/{customer_id}/invoices \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id": "{product_id}"}'
+```
+
+| Method | Path |
+| ------ | ---- |
+| `POST` | `/v1/customers/{id}/subscriptions` |
+| `GET` | `/v1/customers/{id}/subscriptions` |
+| `PATCH` | `/v1/subscriptions/{id}` |
+| `GET` | `/v1/customers/{id}/invoices` |
+| `POST` | `/v1/customers/{id}/invoices` |
+| `GET` | `/v1/invoices/{id}` |
+| `POST` | `/v1/invoices/{id}/void` |
+
+Paid invoices cannot be voided.
+
+## Next
+
+- [Checkout](/guides/commerce-checkout)
+- [Customers](/guides/commerce-customers)

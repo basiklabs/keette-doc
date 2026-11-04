@@ -1,0 +1,119 @@
+---
+title: "Checkout"
+description: "Create a hosted pay link and verify payment."
+icon: "link"
+---
+
+Create a checkout like a Stripe PaymentIntent: you get a `checkout_url`, the payer opens the hosted page, and you poll verify-payment (or wait for webhooks).
+
+## Create checkout
+
+One-shot payment — Keette creates a one-time product, customer, and invoice underneath:
+
+```bash
+curl https://api.keette.com/v1/checkouts \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Setup fee",
+    "description": "Onboarding",
+    "currency": "USDC",
+    "amount": 25,
+    "customer_name": "Ada Okoye",
+    "customer_email": "ada@example.com",
+    "success_url": "https://yoursite.com/paid",
+    "cancel_url": "https://yoursite.com/cancel",
+    "fields_editable": false,
+    "brand_color": "#061F00"
+  }'
+```
+
+Response (nested):
+
+```json
+{
+  "id": "…",
+  "object": "commerce_checkout",
+  "status": "open",
+  "checkout_url": "https://pay.keette.com/c/ckt_…",
+  "amount": { "object": "money", "currency": "USDC", "amount": 25.0, "amount_minor": 25000000 },
+  "business": { "object": "commerce_business", "name": "Acme" },
+  "product": { "object": "commerce_product_line", "name": "Setup fee" },
+  "payer": { "object": "commerce_payer", "name": "Ada Okoye", "email": "ada@example.com" },
+  "host": {
+    "object": "commerce_checkout_host",
+    "checkout_url": "https://pay.keette.com/c/ckt_…",
+    "success_url": "https://yoursite.com/paid",
+    "fields_editable": false,
+    "brand_color": "#061F00"
+  }
+}
+```
+
+The hosted page opens the signed `ckt_…` URL, then handshakes with Core (`POST /public/commerce/checkout-session`) to load business logo, product, and host options.
+
+Or pass `invoice_id` to open checkout for an existing unpaid invoice (omit amount / customer fields).
+
+| Field | Purpose |
+| ----- | ------- |
+| `success_url` / `redirect_url` | Where to send the payer after success |
+| `cancel_url` | Where to send them if they leave |
+| `fields_editable` | When `true`, payer can edit name / email / amount on the page |
+| `brand_color` | Hex `#RRGGBB` for the hosted page primary |
+
+## Verify payment
+
+Poll until `paid` is true (hosted page and your backend can both use this):
+
+```bash
+curl https://api.keette.com/v1/checkouts/{id}/payment \
+  -H "Authorization: Bearer sk_test_…"
+```
+
+```json
+{
+  "id": "…",
+  "object": "commerce_checkout",
+  "status": "paid",
+  "paid": true,
+  "payment": { "object": "commerce_payment", "status": "paid", "paid": true, "paid_at": "…" },
+  "amount": { "object": "money", "currency": "USDC", "amount": 25.0, "amount_minor": 25000000 }
+}
+```
+
+The hosted page also hits the public twin `GET /public/commerce/checkouts/{id}/payment` while the payer is on the link.
+
+## Flow
+
+<Steps>
+  <Step title="Create">
+    `POST /v1/checkouts` → copy `checkout_url`.
+  </Step>
+  <Step title="Payer opens URL">
+    Hosted page renders with your brand colour, redirects, and lock flags.
+  </Step>
+  <Step title="Verify">
+    Poll `GET /v1/checkouts/{id}/payment` or handle `event.commerce.*` webhooks.
+  </Step>
+</Steps>
+
+## Webhooks
+
+- `event.commerce.checkout.payment_succeeded` / `payment_failed`
+- `event.commerce.invoice.payment_succeeded` / `payment_failed` (when an invoice is linked)
+
+See [Event types — Commerce](/webhooks/events#commerce).
+
+## Sandbox testing
+
+Hosted rails behave like live in Dev mode: waiting does not start until the payer acts (NGN **I've made a payment**, crypto deposit address, MoMo STK submit).
+
+To simulate an NGN bank credit without sending money, call [Simulate Transfer](/api-reference/checkouts/simulate-transfer) (`POST /v1/checkouts/{id}/simulate-transfer`) with `sk_test_…`. Full steps for NGN, crypto, and MoMo are in [Environments — Test hosted checkout rails](/environments#test-hosted-checkout-rails-dev-mode).
+
+## Next
+
+- [Settlement](/guides/commerce-settlement)
+- [Billing](/guides/commerce-billing)
+- [Commerce overview](/guides/commerce)
+- [Event types — Commerce](/webhooks/events#commerce)
+- [Environments](/environments)

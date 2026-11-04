@@ -1,0 +1,33 @@
+---
+title: "Settlement"
+description: "When collected money reaches your book, and how the amount is calculated."
+icon: "building-columns"
+---
+
+Successful checkouts **clear** first. Your available balance is credited only after **settlement** — an automatic Keette backoffice step. There is no public API to trigger settle.
+
+## When it runs
+
+Keette settles pending collections on a regular schedule (typically within the same UTC day as the successful payment). Until then, treat the collection as cleared but not yet spendable.
+
+## How the amount is calculated
+
+Settlement credits the workspace book you chose in Settings (**USD** or **USDC**):
+
+| Fee setting | What you receive |
+| ----------- | ---------------- |
+| Fees on you (default) | Product amount minus the Commerce fee |
+| `pass_fees_to_payer: true` | Full product amount (payer already covered the fee) |
+
+Currency conversion (when the payer paid in another currency) happens at clear time into USDC clearing; settle then moves the due amount into your chosen settlement book.
+
+## What this means for your integration
+
+- A paid checkout / webhook success means the payer paid — **not** that funds are already in `available`.
+- Use dashboard / transaction status (`pending_settlement` → `settled`) if you need to know whether settle has completed.
+- Prefer webhooks for payment outcome; do not poll for settle timing in a tight loop.
+
+## Next
+
+- [Checkout](/guides/commerce-checkout)
+- [Commerce overview](/guides/commerce)

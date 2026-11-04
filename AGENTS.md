@@ -22,7 +22,7 @@
 - Sentence case for headings
 - Bold for UI elements: Click **Settings**
 - Code formatting for paths, headers, and identifiers
-- When a surface is not shipped yet, mark **Phase N** with a Note — do not invent request/response fields ahead of implementation
+- Only document what is shipped and callable by integrators. Never invent request/response fields ahead of implementation.
 
 ## Content boundaries
 
@@ -31,5 +31,7 @@
 - Flat sidebar only: no collapse folders for endpoints
 - OpenAPI `summary` is the sidebar label — keep it short (one line, no wrap). Group pages by resource (Balances, Transactions, Beneficiaries, FX…); within a group, shortest title first
 - Do not document internal Payment/Ledger/admin operator APIs or session JWT app routes as public
-- After each implementation phase, add the path to `openapi.yaml` and a `"METHOD /path"` entry in `docs.json` in the same change set
+- **Never** put internal roadmap language in public docs (no Phase N, Bit N.M, build order, “shipping next”, NOTES.md, or unshipped endpoint promises). Keep that in `backend/core/internal/commerce/NOTES.md` only.
+- After each implementation bit, add shipped paths to `openapi.yaml` and `"METHOD /path"` in `docs.json` in the **same change set** as the code. Order pages in each API group by OpenAPI `summary` length (shortest first). Put Commerce narrative in separate guide pages under Guides → Commerce (`guides/commerce*.mdx`), not one mega page. Update `webhooks/events.mdx` only with developer-facing facts for what just shipped.
+
 
