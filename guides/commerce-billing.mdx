@@ -4,7 +4,16 @@ description: "Subscriptions and invoices for Commerce customers."
 icon: "file-invoice"
 ---
 
-## Subscriptions
+Pick the endpoint from the product `kind`:
+
+| Product kind | Create billing | Endpoint |
+| ------------ | -------------- | -------- |
+| `recurring` | Subscription + open invoice | `POST /v1/customers/{id}/subscriptions` |
+| `one_time` | Open invoice (checkout-ready) | `POST /v1/customers/{id}/products/{product_id}` **or** `POST /v1/customers/{id}/invoices` |
+
+`POST …/subscriptions` with a one-time product returns `parameter_invalid` — use attach product or create invoice instead.
+
+## Subscriptions (recurring)
 
 Add a subscription by attaching a **recurring** product:
 
@@ -27,28 +36,45 @@ curl https://api.keette.com/v1/subscriptions/{id} \
 
 `status` is `active`, `paused`, or `canceled`. Canceled subscriptions cannot be reactivated; cancel also voids open invoices and detaches the product.
 
-## Invoices
+## One-time invoices
 
-One-time products can also be invoiced directly:
+Two equivalent ways to bill a **one-time** product:
+
+### Attach product
+
+Creates the customer↔product link and an open invoice (same shape as a subscription attach result, without a `subscription`):
+
+```bash
+curl https://api.keette.com/v1/customers/{customer_id}/products/{one_time_product_id} \
+  -X POST \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+### Create invoice
+
+Creates an open invoice only (no lasting product attachment required):
 
 ```bash
 curl https://api.keette.com/v1/customers/{customer_id}/invoices \
   -H "Authorization: Bearer sk_test_…" \
   -H "Content-Type: application/json" \
-  -d '{"product_id": "{product_id}"}'
+  -d '{"product_id": "{one_time_product_id}"}'
 ```
 
-| Method | Path |
-| ------ | ---- |
-| `POST` | `/v1/customers/{id}/subscriptions` |
-| `GET` | `/v1/customers/{id}/subscriptions` |
-| `PATCH` | `/v1/subscriptions/{id}` |
-| `GET` | `/v1/customers/{id}/invoices` |
-| `POST` | `/v1/customers/{id}/invoices` |
-| `GET` | `/v1/invoices/{id}` |
-| `POST` | `/v1/invoices/{id}/void` |
+List with `GET /v1/customers/{id}/invoices`. Fetch one with `GET /v1/invoices/{id}`. Void open invoices with `POST /v1/invoices/{id}/void` (paid invoices cannot be voided).
 
-Paid invoices cannot be voided.
+| Method | Path | Use for |
+| ------ | ---- | ------- |
+| `POST` | `/v1/customers/{id}/subscriptions` | Recurring only |
+| `GET` | `/v1/customers/{id}/subscriptions` | List subscriptions |
+| `PATCH` | `/v1/subscriptions/{id}` | Pause / resume / cancel |
+| `POST` | `/v1/customers/{id}/products/{product_id}` | One-time **or** recurring attach |
+| `POST` | `/v1/customers/{id}/invoices` | One-time invoice |
+| `GET` | `/v1/customers/{id}/invoices` | List invoices |
+| `GET` | `/v1/invoices/{id}` | Get invoice |
+| `POST` | `/v1/invoices/{id}/void` | Void open invoice |
 
 ## Next
 

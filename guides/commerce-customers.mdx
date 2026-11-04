@@ -4,7 +4,7 @@ description: "Commerce payers — create, update, attach products."
 icon: "users"
 ---
 
-Payer records you bill. Create a customer, then attach a product to open an invoice (and a subscription when the product is recurring).
+Payer records you bill. Create a customer, then attach a product (or create a subscription / invoice) to open billing.
 
 ```bash
 # Create customer
@@ -22,13 +22,23 @@ curl https://api.keette.com/v1/customers \
     }
   }'
 
-# Attach a product
+# Attach a product (one-time → invoice; recurring → subscription + invoice)
 curl https://api.keette.com/v1/customers/{customer_id}/products/{product_id} \
   -X POST \
   -H "Authorization: Bearer sk_test_…" \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
+
+### Which endpoint?
+
+| Goal | Product kind | Endpoint |
+| ---- | ------------ | -------- |
+| Attach + invoice | `one_time` or `recurring` | `POST /v1/customers/{id}/products/{product_id}` |
+| Subscription only API | `recurring` | `POST /v1/customers/{id}/subscriptions` |
+| Invoice only (no attach) | `one_time` | `POST /v1/customers/{id}/invoices` |
+
+Do **not** call `/subscriptions` with a one-time product — that returns `parameter_invalid`. See [Billing](/guides/commerce-billing).
 
 | Method | Path |
 | ------ | ---- |

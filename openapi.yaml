@@ -1886,9 +1886,14 @@ paths:
       tags: [Customers]
       summary: Attach Product
       description: |
-        Link an active product to an active customer. Recurring products also
-        create a subscription and open invoice; one-time products create an
-        open invoice only.
+        Link an active product to an active customer and open billing.
+
+        - **One-time** products → open invoice (use this or `POST /customers/{id}/invoices`).
+        - **Recurring** products → subscription + open invoice (same outcome as
+          `POST /customers/{id}/subscriptions`).
+
+        Prefer this path when you already know the product id in the URL.
+        Do not use `POST /customers/{id}/subscriptions` for one-time products.
       parameters:
         - name: id
           in: path
@@ -1960,7 +1965,13 @@ paths:
       summary: Add Subscription
       description: |
         Attach a **recurring** product to the customer. Creates the subscription
-        and an open invoice. For one-time products use create invoice or attach product.
+        and an open invoice.
+
+        **One-time products are rejected** (`parameter_invalid`). For one-time
+        billing use:
+
+        - `POST /customers/{id}/products/{product_id}` (attach + invoice), or
+        - `POST /customers/{id}/invoices` (invoice only).
       parameters:
         - name: id
           in: path
@@ -2022,8 +2033,11 @@ paths:
       tags: [Invoices]
       summary: Create Invoice
       description: |
-        Create an open invoice for a **one-time** product. Recurring products
-        are billed by attaching the product (which creates a subscription).
+        Create an open invoice for a **one-time** product (no subscription).
+
+        Equivalent one-time path: `POST /customers/{id}/products/{product_id}`.
+        Recurring products should use `POST /customers/{id}/subscriptions`
+        (or attach product), not this endpoint.
       parameters:
         - name: id
           in: path
