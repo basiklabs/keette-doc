@@ -48,7 +48,13 @@ tags:
   - name: Invoices
     description: Commerce invoices
   - name: Checkouts
-    description: Hosted commerce pay sessions
+    description: |
+      Commerce pay sessions. Use the hosted `checkout_url`, or go headless:
+      list `payment_methods`, then `POST /checkouts/{id}/pay` to trigger a
+      crypto address / NGN virtual account / MoMo STK push without the
+      hosted page.
+  - name: Rail sessions
+    description: Poll or cancel a crypto / NGN VA / MoMo rail started by `POST /checkouts/{id}/pay`
 paths:
   /me:
     get:
@@ -2179,6 +2185,114 @@ paths:
                 $ref: "#/components/schemas/CheckoutCreated"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /checkouts/{id}/payment_methods:
+    get:
+      operationId: listCheckoutPaymentMethods
+      tags: [Checkouts]
+      summary: Payment Methods
+      description: |
+        Headless (no hosted page). Which rails (`crypto`, `ngn_va`, `mpesa`)
+        this checkout can be paid with, given its currency and which
+        partners this workspace has enabled. Also returned inline on
+        `POST /checkouts` as `payment_methods`. Pick one and call
+        `POST /checkouts/{id}/pay`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Payment method list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentMethodList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Checkout not found (or belongs to another workspace)
+  /checkouts/{id}/quote:
+    post:
+      operationId: quoteCheckoutRail
+      tags: [Checkouts]
+      summary: Quote Rail
+      description: |
+        Optional fee/FX preview for a method before `POST .../pay` — shows
+        `pay.total`, the exact amount the payer must send.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RailQuoteRequest"
+            examples:
+              crypto:
+                value: { method: crypto, asset: USDC }
+              mpesa:
+                value: { method: mpesa }
+      responses:
+        "200":
+          description: Rail quote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RailQuote"
+        "400":
+          description: Unsupported method for this checkout's currency
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Checkout not found (or belongs to another workspace)
+  /checkouts/{id}/pay:
+    post:
+      operationId: payCheckout
+      tags: [Checkouts]
+      summary: Pay
+      description: |
+        Trigger a payment channel without the hosted page: `method: crypto`
+        issues a deposit address, `ngn_va` issues an NGN virtual account,
+        `mpesa` sends an STK push to `phone`. Verify with
+        `GET /checkouts/{id}/payment` or `GET /rail_sessions/{id}`, same as
+        webhooks.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayCheckoutRequest"
+            examples:
+              crypto:
+                summary: Crypto deposit address
+                value: { method: crypto, asset: USDC, network: base }
+              ngn_va:
+                summary: NGN virtual account
+                value: { method: ngn_va }
+              mpesa:
+                summary: MoMo STK push
+                value: { method: mpesa, phone: "+254712345678" }
+      responses:
+        "200":
+          description: Rail instructions for the requested method
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayCheckoutResult"
+        "400":
+          description: Missing/invalid field for the method (e.g. `phone` for `mpesa`)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Checkout not found (or belongs to another workspace)
   /checkouts/{id}/payment:
     get:
       operationId: verifyCheckoutPayment
@@ -2244,6 +2358,58 @@ paths:
           description: Called outside sandbox (`sk_live_…` or live workspace)
         "404":
           description: Checkout not found
+  /rail_sessions/{id}:
+    get:
+      operationId: getRailSession
+      tags: [Rail sessions]
+      summary: Rail Session Status
+      description: |
+        Poll a rail (crypto / `ngn_va` / `mpesa`) started by
+        `POST /checkouts/{id}/pay`. `status` is `awaiting`, `succeeded`,
+        `failed`, or `expired`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Rail session id from `POST /checkouts/{id}/pay`.
+          schema: { type: string, format: uuid }
+        - name: ack_paid
+          in: query
+          description: Sandbox only — acknowledge a simulated payment while polling.
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Rail session status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RailSessionStatus"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Rail session not found (or belongs to another workspace)
+  /rail_sessions/{id}/cancel:
+    post:
+      operationId: cancelRailSession
+      tags: [Rail sessions]
+      summary: Cancel Rail Session
+      description: Abandon an awaiting rail so a different one can start on the same checkout.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Canceled rail session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RailSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Rail session not found (or belongs to another workspace)
   /customers/{id}/transactions:
     get:
       operationId: listCustomerTransactions
@@ -3969,6 +4135,11 @@ components:
         invoice_id: { type: string, format: uuid }
         customer_id: { type: string, format: uuid }
         expires_at: { type: string, format: date-time }
+        payment_methods:
+          type: array
+          description: Rails this checkout can be paid with headlessly — see `POST /checkouts/{id}/pay`.
+          items:
+            $ref: "#/components/schemas/PaymentMethod"
 
     CheckoutPayment:
       type: object
@@ -4004,6 +4175,164 @@ components:
         reason: { type: string }
         livemode: { type: boolean }
         environment: { type: string, enum: [sandbox] }
+
+    PaymentMethod:
+      type: object
+      properties:
+        object: { type: string, enum: [commerce_payment_method] }
+        method: { type: string, enum: [crypto, ngn_va, mpesa] }
+        label: { type: string }
+
+    PaymentMethodList:
+      type: object
+      properties:
+        object: { type: string, enum: [list] }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/PaymentMethod" }
+        has_more: { type: boolean }
+        total: { type: integer }
+        page: { type: integer }
+        page_size: { type: integer }
+
+    RailQuoteRequest:
+      type: object
+      properties:
+        method:
+          type: string
+          enum: [crypto, ngn_va, mpesa]
+          description: Defaults to the checkout's only available method when omitted.
+        asset:
+          type: string
+          enum: [USDC, USDT]
+          description: Crypto only. Defaults to USDC.
+
+    RailQuote:
+      type: object
+      properties:
+        object: { type: string, enum: [commerce_rail_quote] }
+        note: { type: string }
+        method: { type: string, enum: [crypto, ngn_va, mpesa] }
+        product: { $ref: "#/components/schemas/Money" }
+        pay:
+          type: object
+          properties:
+            object: { type: string, enum: [commerce_rail_quote_pay] }
+            note: { type: string }
+            pass_fees_to_payer: { type: boolean }
+            conversion: { type: boolean }
+            subtotal: { $ref: "#/components/schemas/Money" }
+            fee: { $ref: "#/components/schemas/Money" }
+            total:
+              $ref: "#/components/schemas/Money"
+        rate: { type: string }
+        rate_disclaimer: { type: string }
+        livemode: { type: boolean }
+        environment: { type: string, enum: [live, sandbox] }
+
+    PayCheckoutRequest:
+      type: object
+      required: [method]
+      properties:
+        method:
+          type: string
+          enum: [crypto, ngn_va, mpesa]
+        network:
+          type: string
+          description: Crypto only. Defaults to `base`. See the guide for the full chain list.
+        asset:
+          type: string
+          enum: [USDC, USDT]
+          description: Crypto only. Defaults to USDC.
+        phone:
+          type: string
+          description: Mpesa only, required. E.164 MSISDN to send the STK push to.
+        channel:
+          type: string
+          description: "Mpesa only, optional. e.g. `KE-SAFARICOM-C2B` (default) or `TZ-MPESA-C2B`."
+
+    RailRef:
+      type: object
+      description: Shared fields on every rail instructions object.
+      properties:
+        rail_session_id: { type: string, format: uuid }
+        checkout_id: { type: string, format: uuid }
+        status: { type: string, enum: [awaiting, succeeded, failed, expired] }
+        amount: { $ref: "#/components/schemas/Money" }
+        expires_at: { type: string, format: date-time }
+        livemode: { type: boolean }
+        environment: { type: string, enum: [live, sandbox] }
+
+    CryptoRail:
+      allOf:
+        - $ref: "#/components/schemas/RailRef"
+        - type: object
+          properties:
+            object: { type: string, enum: [commerce_rail_crypto] }
+            note: { type: string }
+            network: { type: string }
+            blockchain: { type: string }
+            address: { type: string }
+            asset: { type: string, enum: [USDC, USDT] }
+
+    NgnVaRail:
+      allOf:
+        - $ref: "#/components/schemas/RailRef"
+        - type: object
+          properties:
+            object: { type: string, enum: [commerce_rail_ngn_va] }
+            note: { type: string }
+            account_name: { type: string }
+            account_number: { type: string }
+            bank_name: { type: string }
+
+    MpesaRail:
+      allOf:
+        - $ref: "#/components/schemas/RailRef"
+        - type: object
+          properties:
+            object: { type: string, enum: [commerce_rail_mpesa] }
+            note: { type: string }
+            channel: { type: string }
+            msisdn: { type: string }
+
+    PayCheckoutResult:
+      type: object
+      properties:
+        object: { type: string, enum: [commerce_pay] }
+        note: { type: string }
+        method: { type: string, enum: [crypto, ngn_va, mpesa] }
+        livemode: { type: boolean }
+        environment: { type: string, enum: [live, sandbox] }
+        crypto: { $ref: "#/components/schemas/CryptoRail" }
+        ngn_va: { $ref: "#/components/schemas/NgnVaRail" }
+        mpesa: { $ref: "#/components/schemas/MpesaRail" }
+
+    RailSessionStatus:
+      type: object
+      properties:
+        object: { type: string, enum: [commerce_rail_session_status] }
+        note: { type: string }
+        rail_session_id: { type: string, format: uuid }
+        checkout_id: { type: string, format: uuid }
+        status: { type: string, enum: [awaiting, succeeded, failed, expired] }
+        reason: { type: string }
+        livemode: { type: boolean }
+        environment: { type: string, enum: [live, sandbox] }
+
+    RailSession:
+      type: object
+      properties:
+        object: { type: string, enum: [commerce_rail_session] }
+        id: { type: string, format: uuid }
+        checkout_id: { type: string, format: uuid }
+        method: { type: string, enum: [crypto, ngn_va, kes_stk] }
+        status: { type: string, enum: [awaiting, succeeded, failed, expired, canceled] }
+        amount: { $ref: "#/components/schemas/Money" }
+        failure_reason: { type: string }
+        expires_at: { type: string, format: date-time }
+        livemode: { type: boolean }
+        environment: { type: string, enum: [live, sandbox] }
 
     CommerceDashboard:
       type: object

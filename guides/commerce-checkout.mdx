@@ -1,10 +1,10 @@
 ---
 title: "Checkout"
-description: "Create a hosted pay link and verify payment."
+description: "Create a hosted pay link — or go headless and trigger payment channels by API — then verify payment."
 icon: "link"
 ---
 
-Create a checkout like a Stripe PaymentIntent: you get a `checkout_url`, the payer opens the hosted page, and you poll verify-payment (or wait for webhooks).
+Create a checkout like a Stripe PaymentIntent. From there you have two options: send the payer the hosted `checkout_url`, or go **headless** and trigger a payment channel yourself (crypto address, NGN virtual account, MoMo STK push) with no UI at all. Either way you verify the same way — poll or wait for webhooks.
 
 ## Create checkout
 
@@ -83,17 +83,90 @@ curl https://api.keette.com/v1/checkouts/{id}/payment \
 
 The hosted page also hits the public twin `GET /public/commerce/checkouts/{id}/payment` while the payer is on the link.
 
+## Headless (API-only)
+
+Skip the hosted page entirely — useful for apps that collect payment details in their own UI. The create response already includes `payment_methods`, so you often don't need an extra call:
+
+```json
+{
+  "id": "…",
+  "payment_methods": [
+    { "object": "commerce_payment_method", "method": "crypto", "label": "Crypto (USDC/USDT)" },
+    { "object": "commerce_payment_method", "method": "ngn_va", "label": "NGN bank transfer" }
+  ]
+}
+```
+
+You can also re-list methods for an open checkout directly:
+
+```bash
+curl https://api.keette.com/v1/checkouts/{id}/payment_methods \
+  -H "Authorization: Bearer sk_test_…"
+```
+
+Methods are driven by currency (NGN → `ngn_va` + `crypto`, KES/TZS → `mpesa` + `crypto`, else `crypto`), filtered to whichever partners this workspace has enabled.
+
+### Trigger a payment channel
+
+One endpoint, `method` picks the rail:
+
+```bash
+# Crypto deposit address
+curl https://api.keette.com/v1/checkouts/{id}/pay \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{ "method": "crypto", "asset": "USDC", "network": "base" }'
+
+# NGN virtual account
+curl https://api.keette.com/v1/checkouts/{id}/pay \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{ "method": "ngn_va" }'
+
+# MoMo STK push
+curl https://api.keette.com/v1/checkouts/{id}/pay \
+  -H "Authorization: Bearer sk_test_…" \
+  -H "Content-Type: application/json" \
+  -d '{ "method": "mpesa", "phone": "+254712345678" }'
+```
+
+`mpesa` responds immediately — the STK prompt is already on the payer's phone:
+
+```json
+{
+  "object": "commerce_pay",
+  "method": "mpesa",
+  "mpesa": {
+    "object": "commerce_rail_mpesa",
+    "rail_session_id": "…",
+    "checkout_id": "…",
+    "status": "awaiting",
+    "channel": "KE-SAFARICOM-C2B",
+    "msisdn": "+254712345678",
+    "amount": { "object": "money", "currency": "KES", "amount": 500.0, "amount_minor": 50000 }
+  }
+}
+```
+
+Want to preview the fee/FX before triggering? `POST /checkouts/{id}/quote` with the same `method` (and `asset` for crypto) returns `pay.total` — the exact amount the payer must send.
+
+### Verify — same as always
+
+Nothing changes here: poll `GET /checkouts/{id}/payment`, or poll the rail directly with `GET /rail_sessions/{id}` (returned as `rail_session_id` above), or just listen for `event.commerce.checkout.payment_succeeded`. If the payer wants to switch rails, `POST /rail_sessions/{id}/cancel` first.
+
+See the [API reference](/api-reference/checkouts/pay) for the full `pay` / `quote` / `payment_methods` / `rail_sessions` schemas, and [Sandbox testing](#sandbox-testing) below to simulate an NGN credit without a real bank transfer.
+
 ## Flow
 
 <Steps>
   <Step title="Create">
-    `POST /v1/checkouts` → copy `checkout_url`.
+    `POST /v1/checkouts` → copy `checkout_url`, or read `payment_methods` for headless.
   </Step>
-  <Step title="Payer opens URL">
-    Hosted page renders with your brand colour, redirects, and lock flags.
+  <Step title="Payer opens URL — or you trigger a rail">
+    Hosted page renders with your brand colour, redirects, and lock flags. Headless: `POST /v1/checkouts/{id}/pay` with a method from `payment_methods`.
   </Step>
   <Step title="Verify">
-    Poll `GET /v1/checkouts/{id}/payment` or handle `event.commerce.*` webhooks.
+    Poll `GET /v1/checkouts/{id}/payment` (or `GET /v1/rail_sessions/{id}`) or handle `event.commerce.*` webhooks.
   </Step>
 </Steps>
 
