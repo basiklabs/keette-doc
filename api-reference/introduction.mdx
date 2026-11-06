@@ -18,7 +18,7 @@ Live vs sandbox is selected by your API key, not by a separate host.
 ## Suggested order
 
 - **Money movement:** Utilities (`scheme` / banks) → Beneficiaries → Payouts.
-- **Commerce:** [Commerce guide](/guides/commerce) → Products → Customers → Checkout → [webhooks](/webhooks/events#commerce).
+- **Commerce:** [Commerce guide](/guides/commerce) → Products → Customers → Checkout (hosted, or headless via Pay + Rail sessions) → [webhooks](/webhooks/events#commerce).
 
 ## Available now
 
@@ -38,5 +38,6 @@ Live vs sandbox is selected by your API key, not by a separate host.
 | Customers | [Get](/api-reference/customers/customer), [List](/api-reference/customers/customers), [Transactions](/api-reference/customers/transactions), [Attach](/api-reference/customers/attach-product), [Detach](/api-reference/customers/detach-product), [Create](/api-reference/customers/create-customer), [Update](/api-reference/customers/update-customer), [Archive](/api-reference/customers/archive-customer) |
 | Subscriptions | [Add](/api-reference/subscriptions/add-subscription), [List](/api-reference/subscriptions/subscriptions), [Update](/api-reference/subscriptions/update-subscription) |
 | Invoices | [Get](/api-reference/invoices/invoice), [List](/api-reference/invoices/invoices), [Void](/api-reference/invoices/void-invoice), [Create](/api-reference/invoices/create-invoice) |
-| Checkouts | [Create](/api-reference/checkouts/create-checkout), [Verify payment](/api-reference/checkouts/verify-payment), [Simulate transfer](/api-reference/checkouts/simulate-transfer) |
+| Checkouts | [Create](/api-reference/checkouts/create-checkout), [Payment methods](/api-reference/checkouts/payment-methods), [Quote rail](/api-reference/checkouts/quote-rail), [Pay (headless)](/api-reference/checkouts/pay), [Verify payment](/api-reference/checkouts/verify-payment), [Simulate transfer](/api-reference/checkouts/simulate-transfer) |
+| Rail sessions | [Status](/api-reference/rail-sessions/rail-session-status), [Cancel](/api-reference/rail-sessions/cancel-rail-session) |
 | Commerce ops | [Dashboard](/api-reference/commerce/dashboard) |

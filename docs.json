@@ -229,8 +229,19 @@
             "openapi": "openapi.yaml",
             "pages": [
               "POST /checkouts",
+              "GET /checkouts/{id}/payment_methods",
+              "POST /checkouts/{id}/quote",
+              "POST /checkouts/{id}/pay",
               "GET /checkouts/{id}/payment",
               "POST /checkouts/{id}/simulate-transfer"
+            ]
+          },
+          {
+            "group": "Rail sessions",
+            "openapi": "openapi.yaml",
+            "pages": [
+              "GET /rail_sessions/{id}",
+              "POST /rail_sessions/{id}/cancel"
             ]
           },
           {
